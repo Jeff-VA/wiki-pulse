@@ -9,15 +9,22 @@ needs to change in it, change it there and upgrade the pin, not here.
 
 ## Where things are
 
-- `config/ingestion.yaml`: the datasets that arrive on Kafka, and their columns.
+- `config/ingestion.yaml`: the two datasets: `edits`, read from Wikimedia's
+  feed (`source`), and `trends`, made from edits by the burst detector
+  (`processor`).
 - `config/ontology.yaml`: what the data means: dimensions and metrics, with
   their labels and formats.
-- `config/storage.yaml` and `config/quality_rules.yaml`: the Iceberg tables,
-  the rollups, and the checks a rollup must pass before it publishes.
+- `config/storage.yaml`, `config/pipelines.yaml` and `config/quality_rules.yaml`:
+  the Iceberg tables, the rollups, the pipeline steps, and the checks each
+  gold table must pass before it publishes.
 - `config/views/*.sql`: named queries that dashboards and agents read.
 - `config/dashboards/*.html`: pages of live chart tags, at `/d/<name>`.
-- Python modules next to `config/`: the project's own code, such as a
-  dataset's `simulator: module:function`.
+- `wiki_pulse/`: the project's code. `edits.py` turns the feed's events into
+  edits, `trends.py` is the burst detector, `explain.py` asks Claude about a
+  burst, `classifier.py` is the news classifier step, and `simulator.py` makes
+  synthetic edits and bursts for the tests.
+- The live stack calls Claude (Haiku 4.5) only when `.env` holds
+  `ANTHROPIC_API_KEY`. Never print it or copy it into an image.
 
 ## Building a dashboard
 
@@ -40,7 +47,7 @@ registers for Claude Code; each has a command-line twin.
 3. **Write the page** in plain HTML with the chart tags listed at the top of
    http://127.0.0.1:8000/al.js (the `build_dashboard` MCP prompt includes
    them). Names are enough: labels and formats come from the ontology. Copy
-   the layout of `config/dashboards/overview.html`.
+   the layout of `config/dashboards/pulse.html`.
 4. **Check** after every edit: `agentic-lakehouse check` (`check_dashboards`)
    must report 0 problems.
 5. **Look**: `agentic-lakehouse screenshot <name>` (`screenshot_dashboard`)
@@ -50,5 +57,6 @@ registers for Claude Code; each has a command-line twin.
 ## Tests
 
 `pytest` runs `tests/`, which use `agentic_lakehouse.testing`: every view and
-dashboard on DuckDB stand-ins for the stack, with no Docker needed. The
-dashboard test needs Chrome and skips without it.
+dashboard on DuckDB stand-ins for the stack, with no Docker needed, and the
+project's code with the API and Kafka stood in for. The dashboard test needs
+Chrome and skips without it.

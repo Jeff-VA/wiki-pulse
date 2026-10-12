@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wikipedias compared</title>
+<!-- Chart tags over the project's views (config/views/*.sql); the reference is at the top of /al.js. -->
+<script type="module" src="/al.js"></script>
+<style>
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin: 0; max-width: 720px; }
+  nav { display: flex; gap: 14px; font-size: 13px; margin-top: 8px; }
+  nav a { color: var(--text-secondary); text-decoration: none; }
+  nav a[aria-current="page"] { color: var(--text-primary); font-weight: 600; }
+  nav a:hover { color: var(--text-primary); }
+  .grid-2x2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: 12px; }
+  .controls { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 12px; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1>Wikipedias compared</h1>
+      <p class="sub">From the gold tables: hourly rollups and daily pipeline steps over the lakehouse, published only after their quality checks pass. Complete hours only. Times in UTC.</p>
+      <nav aria-label="Dashboards"><a href="/d/pulse">Live</a><a href="/d/trends">Bursts</a><a href="/d/wikis" aria-current="page">Wikis</a></nav>
+    </div>
+    <div class="controls"><al-live></al-live><al-theme></al-theme></div>
+  </header>
+
+  <section aria-labelledby="hourly-title">
+    <div class="al-head">
+      <div>
+        <h2 id="hourly-title">Hour by hour</h2>
+        <p class="al-caption">Six of the biggest Wikipedias, from <code>gold.wiki_hourly</code>.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <al-param name="hours" options="24=24 h,48=48 h,168=7 days" value="48" label="Range"></al-param>
+      <al-param name="metric" kind="select" label="Metric" view="wiki_hourly"
+                options="edit_count,editors,new_articles,revert_share,bot_share,anonymous_share"></al-param>
+    </div>
+    <al-lines view="wiki_hourly" x="hour" y="$metric" series="wiki" colors="enwiki,dewiki,frwiki,eswiki,jawiki,ruwiki"></al-lines>
+  </section>
+
+  <section class="al-section" aria-labelledby="compare-title">
+    <div class="al-head"><h2 id="compare-title">The 15 busiest, side by side</h2><span class="al-caption">over the same range</span></div>
+    <div class="grid-2x2">
+      <al-bars view="wikis_compare" category="wiki" value="revert_share" sort="desc" highlight="max" label="Revert share: edits undoing other edits"></al-bars>
+      <al-bars view="wikis_compare" category="wiki" value="bot_share" sort="desc" highlight="max" label="Bot share"></al-bars>
+      <al-bars view="wikis_compare" category="wiki" value="anonymous_share" sort="desc" highlight="max" label="Anonymous share"></al-bars>
+      <al-bars view="wikis_compare" category="wiki" value="net_bytes" sort="desc" label="Net bytes added"></al-bars>
+    </div>
+  </section>
+
+  <section class="al-section" aria-labelledby="top-title">
+    <div class="al-head">
+      <div>
+        <h2 id="top-title">The day's most edited articles</h2>
+        <p class="al-caption">From <code>gold.top_articles_daily</code>, a pipeline step over the hourly article rollup, joined with the day's bursts.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <al-param name="days_ago" options="0=Today,1=Yesterday,2=2 days ago" value="0" label="Day"></al-param>
+    </div>
+    <al-table view="top_articles" columns="rank,url,language,edits,reverts,peak_hour_edits,bursts,reading,explanation"></al-table>
+  </section>
+
+  <section class="al-section al-card" aria-labelledby="gates-title">
+    <div class="al-head"><h2 id="gates-title">Quality gates</h2><span class="al-caption">checked before each publish</span></div>
+    <al-gates></al-gates>
+  </section>
+
+  <footer>
+    Data: <a href="https://stream.wikimedia.org/v2/stream/recentchange">Wikimedia EventStreams</a>, CC BY-SA ·
+    Gateway: <a href="/docs">REST API docs</a> · Views at <a href="/views">/views</a> · MCP at <code>/mcp</code>
+  </footer>
+</main>
+</body>
+</html>

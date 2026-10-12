@@ -1,19 +1,79 @@
-# What arrives on the event streams: each dataset's Kafka topic and raw event
-# schema, and the Pinot real-time table that consumes it. Ontology models name
-# a dataset as their `source`. Replace the starter dataset with yours.
+# What arrives on the event streams. wiki-pulse has two datasets, and the
+# platform makes both itself, so nothing else writes to their Kafka topics:
+#
+# - edits: read live from Wikimedia's public feed of recent changes, by
+#   `agentic-lakehouse ingest` (every edit, in every language, within seconds)
+# - trends: made from edits as they stream, by the burst detector
+#   (`agentic-lakehouse process`, code in wiki_pulse/trends.py)
+#
+# Each `simulator` makes synthetic events of the same shape, for the tests.
 version: "1.0.0"
 
 datasets:
-  - name: events
-    description: Starter events, one per action, with a category and an amount.
-    topic: events
-    time_column: event_ts  # event time, UTC
-    # simulator: your_module:function  # realistic synthetic events; without it, random values that fit the columns
+  - name: edits
+    description: >
+      Every edit to a Wikipedia article, in every language, live from Wikimedia's
+      recent-changes feed. Bots' edits are included and flagged; edits to talk,
+      user and project pages, and other Wikimedia projects, are left out.
+    topic: wiki-edits
+    time_column: event_ts  # when the edit was saved, UTC
+    source:
+      kind: sse
+      url: https://stream.wikimedia.org/v2/stream/recentchange
+      transform: wiki_pulse.edits:from_recentchange
+      headers:
+        # Wikimedia asks clients to say who they are: https://meta.wikimedia.org/wiki/User-Agent_policy
+        User-Agent: wiki-pulse/0.1 (https://github.com/Jeff-VA/wiki-pulse)
+    simulator: wiki_pulse.simulator:edit_session
     columns:
       - {name: event_ts, type: timestamp}
-      - {name: category, type: string}
-      - {name: amount, type: double}
-      - {name: units, type: int}
+      - {name: wiki, type: string}  # e.g. enwiki, dewiki
+      - {name: language, type: string}  # e.g. en, de: the wiki's subdomain
+      - {name: title, type: string}
+      - {name: kind, type: string}  # edit, or new for an article's first edit
+      - {name: editor, type: string}  # account name, IP address, or temporary account (~...)
+      - {name: is_bot, type: boolean}
+      - {name: is_anonymous, type: boolean}  # an IP address or a temporary account
+      - {name: is_minor, type: boolean}
+      - {name: is_revert, type: boolean}  # its summary says it undoes another edit
+      - {name: bytes_delta, type: long}  # change in the article's size
+      - {name: page_bytes, type: long}  # the article's size after the edit
+      - {name: edit_summary, type: string}  # the editor's comment, up to 300 characters
+      - {name: url, type: string}  # the article
     realtime:
-      table: events
-      retention_days: 7  # older data is answered from the Iceberg table (storage.yaml)
+      table: edits
+      retention_days: 2
+
+  - name: trends
+    description: >
+      Bursts: an article getting far more edits than usual for its wiki and the
+      hour, flagged as it happens by the burst detector. Each burst carries its
+      last 30 minutes' counts, how surprising they are, the news classifier's
+      probability that a story is breaking, and, for most, Claude's label and
+      one-line explanation.
+    topic: wiki-trends
+    time_column: event_ts  # the edit that made it a burst
+    processor:
+      input: edits
+      run: wiki_pulse.trends:TrendDetector
+      warmup_minutes: 30  # rebuilds each article's last 30 minutes after a restart
+    simulator: wiki_pulse.simulator:alert
+    columns:
+      - {name: event_ts, type: timestamp}
+      - {name: wiki, type: string}
+      - {name: language, type: string}
+      - {name: title, type: string}
+      - {name: url, type: string}
+      - {name: edits_30m, type: int}  # edits in the last 30 minutes
+      - {name: editors_30m, type: int}  # different editors among them
+      - {name: expected_edits, type: double}  # what's usual in 30 minutes for an article being edited
+      - {name: surprise, type: double}  # standard deviations above usual
+      - {name: bot_share, type: double}  # 0 to 1, of the 30 minutes' edits
+      - {name: anonymous_share, type: double}
+      - {name: revert_share, type: double}
+      - {name: p_news, type: double}  # the news classifier's probability; null until it's trained
+      - {name: claude_label, type: string}  # news, edit war, routine or unclear; null if Claude didn't read it
+      - {name: explanation, type: string}  # Claude's one sentence
+    realtime:
+      table: trends
+      retention_days: 7

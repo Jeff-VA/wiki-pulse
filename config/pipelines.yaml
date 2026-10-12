@@ -1,0 +1,80 @@
+# Steps: SQL or Python that writes a table, run in the order their reads
+# require by `agentic-lakehouse steps --serve`. Together with the rollups and
+# the burst detector they make a loop that learns:
+#
+#   raw.edits -> gold.article_hourly (rollup) -> trend_baselines --+
+#                                                                  v
+#   edits stream ------------------------------------------> burst detector -> trends
+#                                                                  ^              |
+#                     news_classifier <- raw.trends <--------------+--------------+
+#
+# The detector reads the baselines and the classifier's weights every 15
+# minutes, so both improve as history and Claude's labels accumulate.
+version: "1.0.0"
+
+steps:
+  - name: trend_baselines
+    output: gold.trend_baselines
+    description: >
+      What's usual, for each wiki and hour of the day: the mean and spread of
+      the edits an article gets in an hour while it's being edited, over the
+      last 7 days. The burst detector measures surprise against these.
+    sql: |
+      SELECT wiki, hour(event_ts) AS hour_of_day, count(*) AS article_hours,
+             avg(edit_count) AS mean_edits, coalesce(stddev_samp(edit_count), 0) AS std_edits
+      FROM gold.article_hourly
+      WHERE event_ts >= now() - INTERVAL '7' DAY
+      GROUP BY wiki, hour(event_ts)
+    every_minutes: 60
+
+  - name: top_articles_daily
+    output: gold.top_articles_daily
+    description: >
+      The 50 most edited articles of each day, across every Wikipedia, with how
+      many of their edits were reverts and whether the burst detector flagged
+      them, and Claude's read of the burst if it had one.
+    sql: |
+      WITH daily AS (
+        SELECT date_trunc('day', event_ts) AS day, wiki, language, title, max(url) AS url,
+               sum(edit_count) AS edits, sum(revert_edits) AS reverts, max(edit_count) AS peak_hour_edits
+        FROM gold.article_hourly
+        WHERE event_ts >= date_trunc('day', now()) - INTERVAL '7' DAY
+        GROUP BY 1, 2, 3, 4
+      ),
+      ranked AS (
+        SELECT *, row_number() OVER (PARTITION BY day ORDER BY edits DESC, title) AS rank FROM daily
+      ),
+      bursts AS (
+        SELECT date_trunc('day', event_ts) AS day, wiki, title, count(*) AS bursts,
+               max_by(coalesce(claude_label, 'not read'), event_ts) AS reading, max_by(explanation, event_ts) AS explanation
+        FROM raw.trends
+        GROUP BY 1, 2, 3
+      )
+      SELECT r.day, r.rank, r.wiki, r.language, r.title, r.url, r.edits, r.reverts, r.peak_hour_edits,
+             coalesce(b.bursts, 0) AS bursts, b.reading, b.explanation
+      FROM ranked AS r
+      LEFT JOIN bursts AS b ON b.day = r.day AND b.wiki = r.wiki AND b.title = r.title
+      WHERE r.rank <= 50
+    time_column: day
+    every_minutes: 30
+
+  - name: news_classifier
+    output: gold.news_classifier
+    description: >
+      A logistic regression that tells a story breaking from an edit war or
+      routine work, from a burst's numbers alone. It's trained on the bursts
+      Claude has labeled, and the burst detector applies it to every burst,
+      including the many Claude never reads. One row per weight.
+    run: wiki_pulse.classifier:fit
+    reads: [raw.trends]
+    columns:
+      feature: string
+      weight: double
+      center: double
+      scale: double
+      samples: int
+      news_share: double
+      training_accuracy: double
+      trained_at: timestamp
+    time_column: trained_at
+    every_minutes: 60

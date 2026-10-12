@@ -1,15 +1,46 @@
-# What "good" looks like for each rollup. If an `error` check fails, the gold
-# table keeps its last good contents; `warn` checks are only reported.
+# What "good" looks like for each gold table, rollups and steps alike. If an
+# `error` check fails, the table keeps its last good contents; `warn` checks
+# are only reported. The dashboards show every gate's last result.
 version: "1.0.0"
 
 rules:
-  - table: gold.hourly_activity
+  - table: gold.wiki_hourly
     checks:
-      - type: row_count
-        min: 1
-      - type: unique  # one row per hour and category
-        columns: [event_ts, category]
-      - type: not_null
-        columns: [category, event_count]
-      - type: freshness
-        max_lag_hours: 2
+      - {type: row_count, min: 1}
+      - {type: unique, columns: [event_ts, wiki]}  # one row per wiki and hour
+      - {type: not_null, columns: [wiki, edit_count]}
+      - type: expression
+        description: a wiki's bots, anonymous editors and reverts can't outnumber its edits
+        sql: "bot_edits <= edit_count AND anonymous_edits <= edit_count AND revert_edits <= edit_count"
+      - {type: freshness, max_lag_hours: 2}  # the feed or the flush stopped
+
+  - table: gold.article_hourly
+    checks:
+      - {type: row_count, min: 1}
+      - {type: unique, columns: [event_ts, wiki, title]}
+      - {type: range, column: edit_count, min: 1}
+      - {type: freshness, max_lag_hours: 2}
+
+  - table: gold.trend_baselines
+    checks:
+      - {type: row_count, min: 1}
+      - {type: unique, columns: [wiki, hour_of_day]}
+      - {type: range, column: hour_of_day, min: 0, max: 23}
+      - {type: range, column: mean_edits, min: 1}  # an article edited in an hour has at least one edit in it
+
+  - table: gold.top_articles_daily
+    checks:
+      - {type: unique, columns: [day, rank]}
+      - {type: range, column: rank, min: 1, max: 50}
+      - {type: freshness, max_lag_hours: 26}  # day is the day's start
+
+  - table: gold.news_classifier
+    checks:
+      - {type: not_null, columns: [feature, weight, center, scale]}
+      - type: expression
+        description: the classifier beats always guessing the more common label
+        sql: "training_accuracy > greatest(news_share, 1 - news_share)"
+      - type: range  # huge weights mean the fit ran away; the detector keeps the last good model
+        column: weight
+        min: -15
+        max: 15

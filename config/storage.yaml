@@ -1,22 +1,42 @@
 # Long-term storage: one Iceberg table per dataset, filled by the flush, and
 # rollups: semantic queries kept as gold tables, published only after their
-# quality checks (quality_rules.yaml) pass.
+# quality checks (quality_rules.yaml) pass. pipelines.yaml builds on these.
 version: "1.0.0"
 
 tables:
-  - dataset: events
-    table: raw.events
+  - dataset: edits
+    table: raw.edits
     partition_by: day
     flush_every_minutes: 5
     allowed_lateness_minutes: 2
+  - dataset: trends
+    table: raw.trends
+    partition_by: day
+    flush_every_minutes: 5
+    allowed_lateness_minutes: 1
 
 rollups:
-  - table: gold.hourly_activity
-    description: Hourly activity per category.
+  - table: gold.wiki_hourly
+    description: >
+      Each wiki's hour of editing: edits, editors, new articles, and the edits
+      by bots, anonymous editors and reverts.
     query:
-      metrics: [event_count, total_amount, avg_amount]
-      dimensions: [category]
+      metrics: [edit_count, editors, new_articles, bot_edits, anonymous_edits, revert_edits, net_bytes]
+      dimensions: [wiki, language]
       grain: hour
-    lookback_hours: 6
-    backfill_days: 7
-    every_minutes: 5
+    lookback_hours: 3
+    backfill_days: 2
+    every_minutes: 10
+
+  - table: gold.article_hourly
+    description: >
+      Each article's hour of editing, for every article edited in the hour. The
+      burst detector's sense of normal (trend_baselines) and the daily top
+      articles are computed from it.
+    query:
+      metrics: [edit_count, editors, revert_edits]
+      dimensions: [wiki, language, title, url]
+      grain: hour
+    lookback_hours: 3
+    backfill_days: 2
+    every_minutes: 15

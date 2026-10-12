@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wikipedia, live</title>
+<!-- Chart tags over the project's views (config/views/*.sql); the reference is at the top of /al.js. -->
+<script type="module" src="/al.js"></script>
+<style>
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin: 0; max-width: 720px; }
+  nav { display: flex; gap: 14px; font-size: 13px; margin-top: 8px; }
+  nav a { color: var(--text-secondary); text-decoration: none; }
+  nav a[aria-current="page"] { color: var(--text-primary); font-weight: 600; }
+  nav a:hover { color: var(--text-primary); }
+  .controls { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 12px; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1>Wikipedia, live</h1>
+      <p class="sub">Every edit to every Wikipedia article, seconds after it's saved: read from Wikimedia's public feed into Kafka and Pinot. Times in UTC.</p>
+      <nav aria-label="Dashboards"><a href="/d/pulse" aria-current="page">Live</a><a href="/d/trends">Bursts</a><a href="/d/wikis">Wikis</a></nav>
+    </div>
+    <div class="controls"><al-live></al-live><al-theme></al-theme></div>
+  </header>
+
+  <section aria-labelledby="kpi-title">
+    <div class="al-head"><h2 id="kpi-title">Last 60 minutes, every Wikipedia</h2><span class="al-caption">change vs the hour before</span></div>
+    <div class="kpis">
+      <al-kpi view="pulse_total" value="edit_count" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
+      <al-kpi view="pulse_total" value="editors" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
+      <al-kpi view="pulse_total" value="new_articles" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
+      <al-kpi view="pulse_total" value="revert_share" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
+      <al-freshness dataset="edits"></al-freshness>
+    </div>
+  </section>
+
+  <section class="al-section" aria-labelledby="minute-title">
+    <div class="al-head">
+      <div>
+        <h2 id="minute-title">Edits per minute</h2>
+        <p class="al-caption">By who made them. Anonymous means an IP address or a temporary account.</p>
+      </div>
+    </div>
+    <al-lines view="edits_per_minute" x="minute" y="edit_count" series="editor_type" params="minutes=120"
+              colors="registered,anonymous,bot" height="220"></al-lines>
+  </section>
+
+  <section class="al-section" aria-labelledby="bursts-title">
+    <div class="al-head">
+      <div>
+        <h2 id="bursts-title">Bursting now</h2>
+        <p class="al-caption">Articles getting far more edits than usual, in the last 6 hours. Claude reads the freshest; the classifier scores them all. More on <a href="/d/trends">Bursts</a>.</p>
+      </div>
+    </div>
+    <al-table view="bursts_latest" params="hours=6"
+              columns="flagged_at,url,language,peak_edits,peak_surprise,news_probability,reading,explanation"></al-table>
+  </section>
+
+  <section class="al-section" aria-labelledby="busiest-title">
+    <div class="al-head"><h2 id="busiest-title">Busiest</h2></div>
+    <div class="controls">
+      <al-param name="minutes" options="60=Last hour,360=6 hours,1440=24 hours" value="60" label="Window"></al-param>
+    </div>
+    <div class="two-col">
+      <al-bars view="wikis_now" category="wiki" value="edit_count" label="Wikipedias by edits"></al-bars>
+      <al-table view="articles_now" columns="url,language,edit_count,editors,revert_share" label="Most edited articles"></al-table>
+    </div>
+  </section>
+
+  <footer>
+    Data: <a href="https://stream.wikimedia.org/v2/stream/recentchange">Wikimedia EventStreams</a>, CC BY-SA ·
+    Gateway: <a href="/docs">REST API docs</a> · Views at <a href="/views">/views</a> · MCP at <code>/mcp</code>
+  </footer>
+</main>
+</body>
+</html>

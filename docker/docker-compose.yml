@@ -4,9 +4,11 @@
 #
 #   docker compose -f docker/docker-compose.yml up -d --build
 #
-# On a first start, setup creates the topics and tables and publishes 24 hours
-# of synthetic history; the stream keeps data live until your producers write
-# to Kafka. Dashboards and API: http://127.0.0.1:8000
+# setup creates the topics and tables. Then ingest reads Wikimedia's live feed
+# of edits into Kafka, the trends service detects bursts in it as they happen,
+# flush keeps Iceberg current, and rollups and steps build the gold tables.
+# Claude reads bursts when .env holds ANTHROPIC_API_KEY. Dashboards and API:
+# http://127.0.0.1:8000
 #
 # Host ports: API and dashboards 8000, Kafka 9092, Pinot controller UI 9000,
 # Pinot broker 8099, Trino 8080, Iceberg REST 8181, MinIO S3 API 9100 and
@@ -24,7 +26,7 @@ x-app: &app
     - ./config/deployment.yaml:/app/config/deployment.yaml:ro  # container-network addresses
     - ../proposals:/app/proposals  # drift proposals land in the checkout, ready for git apply
   env_file:
-    - path: ../.env  # ANTHROPIC_API_KEY for the drift agent, if present
+    - path: ../.env  # ANTHROPIC_API_KEY, if present: Claude's reads of bursts, and the drift agent
       required: false
   mem_limit: 512m
 
@@ -197,7 +199,7 @@ services:
   setup:
     <<: *app
     restart: "no"
-    command: [setup, --seed-hours, "24"]
+    command: [setup]  # no synthetic history: every event here is real
     depends_on:
       kafka: {condition: service_healthy}
       pinot-controller: {condition: service_healthy}
@@ -207,9 +209,14 @@ services:
       minio-init: {condition: service_completed_successfully}
       trino: {condition: service_healthy}
 
-  stream:
+  ingest:  # Wikimedia's recent changes -> the edits topic
     <<: *app
-    command: [stream]
+    command: [ingest, --dataset, edits]
+    depends_on: *after-setup
+
+  trends:  # the burst detector: edits -> trends (wiki_pulse/trends.py)
+    <<: *app
+    command: [process, --dataset, trends]
     depends_on: *after-setup
 
   flush:
@@ -220,6 +227,11 @@ services:
   rollups:
     <<: *app
     command: [rollups, --serve]
+    depends_on: *after-setup
+
+  steps:  # pipelines.yaml: baselines, daily top articles, the news classifier
+    <<: *app
+    command: [steps, --serve]
     depends_on: *after-setup
 
   drift:

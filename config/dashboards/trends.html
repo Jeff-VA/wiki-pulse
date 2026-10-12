@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wikipedia bursts</title>
+<!-- Chart tags over the project's views (config/views/*.sql); the reference is at the top of /al.js. -->
+<script type="module" src="/al.js"></script>
+<style>
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin: 0; max-width: 720px; }
+  nav { display: flex; gap: 14px; font-size: 13px; margin-top: 8px; }
+  nav a { color: var(--text-secondary); text-decoration: none; }
+  nav a[aria-current="page"] { color: var(--text-primary); font-weight: 600; }
+  nav a:hover { color: var(--text-primary); }
+  .controls { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 12px; }
+  .how p { margin: 0 0 8px; color: var(--text-secondary); font-size: 13px; }
+  .how p:last-child { margin-bottom: 0; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1>Bursts</h1>
+      <p class="sub">Articles getting far more edits than usual for their wiki and the hour, flagged by the burst detector seconds after the edit that tips them over. Claude reads the freshest and says what's happening; a classifier trained on Claude's labels scores every burst. Times in UTC.</p>
+      <nav aria-label="Dashboards"><a href="/d/pulse">Live</a><a href="/d/trends" aria-current="page">Bursts</a><a href="/d/wikis">Wikis</a></nav>
+    </div>
+    <div class="controls"><al-live></al-live><al-theme></al-theme></div>
+  </header>
+
+  <section aria-labelledby="kpi-title">
+    <div class="al-head"><h2 id="kpi-title">Last 24 hours</h2><span class="al-caption">change vs the day before</span></div>
+    <div class="al-grid">
+      <al-kpi view="burst_total" value="bursts" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
+      <al-kpi view="burst_total" value="burst_articles" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
+      <al-kpi view="burst_total" value="news_share" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
+      <al-kpi view="burst_total" value="agreement" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
+    </div>
+  </section>
+
+  <section class="al-section" aria-labelledby="latest-title">
+    <div class="al-head"><h2 id="latest-title">Latest bursts</h2><span class="al-caption">newest first, last 24 hours</span></div>
+    <div class="controls">
+      <al-param name="reading" options="=All,news=News,edit war=Edit wars,routine=Routine,unclear=Unclear,not read=Not read" label="Claude's read"></al-param>
+    </div>
+    <al-table view="bursts_latest"
+              columns="flagged_at,url,language,peak_edits,peak_editors,peak_surprise,news_probability,reading,explanation"></al-table>
+  </section>
+
+  <section class="al-section" aria-labelledby="mix-title">
+    <div class="al-head"><h2 id="mix-title">What kind, and where</h2><span class="al-caption">last 24 hours</span></div>
+    <div class="two-col">
+      <al-bars view="bursts_by_reading" category="reading" value="bursts" label="Bursts by Claude's read"></al-bars>
+      <al-bars view="bursts_by_language" category="language" value="bursts" label="Bursts by Wikipedia language"></al-bars>
+    </div>
+  </section>
+
+  <section class="al-section" aria-labelledby="hourly-title">
+    <div class="al-head"><h2 id="hourly-title">Bursts per hour</h2><span class="al-caption">last 48 hours</span></div>
+    <div class="controls">
+      <al-param name="count" kind="select" label="Count" view="bursts_hourly" options="bursts,read_bursts,news_bursts"></al-param>
+    </div>
+    <al-lines view="bursts_hourly" x="hour" y="$count" height="220"></al-lines>
+  </section>
+
+  <section class="al-section" aria-labelledby="model-title">
+    <div class="al-head">
+      <div>
+        <h2 id="model-title">The news classifier</h2>
+        <p class="al-caption"><al-text view="classifier_status" empty="Not trained yet: it needs 30 bursts Claude has labeled, at least 5 of them news and 5 not.">Trained on {samples} bursts Claude labeled, {news_share} of them news, and right about {training_accuracy} of them. Last trained {trained_at} UTC; it retrains hourly.</al-text></p>
+      </div>
+    </div>
+    <div class="two-col">
+      <al-bars view="classifier_weights" category="feature" value="weight" label="What pushes a burst toward news (+) or away (−)"></al-bars>
+      <div class="al-card how">
+        <p><strong>Why a classifier, when Claude reads bursts?</strong> Claude reads at most 20 bursts an hour, the freshest. A logistic regression trained on its labels scores every burst, instantly and for free: Claude's judgment, distilled into six numbers.</p>
+        <p><strong>How it learns.</strong> A pipeline step refits it hourly on every burst Claude has labeled, and publishes the weights as a table, behind a quality gate: the model must beat always guessing the more common label. The burst detector reloads the weights every 15 minutes.</p>
+        <p><strong>How it's checked.</strong> Agreement with Claude, above, counts only bursts scored before Claude labeled them, so it's accuracy on bursts the model hadn't seen.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="al-section al-card" aria-labelledby="gates-title">
+    <div class="al-head"><h2 id="gates-title">Quality gates</h2><span class="al-caption">rollups and pipeline steps, checked before each publish</span></div>
+    <al-gates></al-gates>
+  </section>
+
+  <footer>
+    Data: <a href="https://stream.wikimedia.org/v2/stream/recentchange">Wikimedia EventStreams</a>, CC BY-SA ·
+    Labels and explanations: Claude Haiku 4.5 · Gateway: <a href="/docs">REST API docs</a> · MCP at <code>/mcp</code>
+  </footer>
+</main>
+</body>
+</html>
