@@ -1,0 +1,2 @@
+# The engine, pinned to a release. To upgrade, change the version in both places.
+agentic-lakehouse @ https://github.com/Jeff-VA/agentic-lakehouse/releases/download/v0.2.0/agentic_lakehouse-0.2.0-py3-none-any.whl
