@@ -36,7 +36,7 @@ class Claude:
         return Reading(category="news", explanation=f"{burst['title']} is in the news.")
 
 
-def detector(tables=None, explainer=None, now=START + timedelta(minutes=10)):
+def detector(tables=None, explainer=None, now=START + timedelta(minutes=7)):  # a minute after the test burst
     tables = {"gold.trend_baselines": BASELINES, "gold.news_classifier": MODEL} if tables is None else tables
     platform = load_platform(CONFIG)
     messages = []

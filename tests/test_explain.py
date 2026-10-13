@@ -39,14 +39,19 @@ def explainer(messages: Messages, **options):
 
 
 def reply(category="news", stop_reason="end_turn"):
-    return SimpleNamespace(stop_reason=stop_reason, parsed_output=Reading(category=category, explanation="An album came out."))
+    return SimpleNamespace(
+        stop_reason=stop_reason,
+        parsed_output=Reading(category=category, explanation="An album came out."),
+        usage=SimpleNamespace(input_tokens=612, output_tokens=41),
+    )
 
 
 def test_it_asks_haiku_for_a_structured_reading():
     messages = Messages(reply())
-    reader, _, _ = explainer(messages)
+    reader, _, logged = explainer(messages)
     reading = reader.read(BURST, ["Updated chart positions", "rv unsourced"])
     assert (reading.category, reading.explanation) == ("news", "An album came out.")
+    assert logged == ["explain: Taylor Swift (en) reads as news (612 tokens in, 41 out)"]  # what each read costs
     [request] = messages.calls
     assert request["model"] == MODEL == "claude-haiku-4-5-20251001"
     assert request["output_format"] is Reading
@@ -61,6 +66,19 @@ def test_it_keeps_to_its_hourly_budget():
     clock.t = 3601  # an hour later
     assert reader.read(BURST, []) is not None
     assert len(messages.calls) == 3
+
+
+def test_it_keeps_to_its_daily_budget():
+    messages = Messages(reply())
+    reader, clock, logged = explainer(messages, per_hour=2, per_day=3)
+    for hour in range(3):
+        clock.t = hour * 3601
+        reader.read(BURST, [])
+        reader.read(BURST, [])
+    assert len(messages.calls) == 3  # two in the first hour, one more the next, then the day's budget is spent
+    assert logged[-1] == "explain: the day's 3 reads are spent; bursts go unread until the oldest is a day old"
+    clock.t = 86401 + 1  # a day after the first read
+    assert reader.read(BURST, []) is not None
 
 
 def test_failures_leave_the_burst_unread():

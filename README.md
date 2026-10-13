@@ -66,7 +66,8 @@ without publishing anything twice.
 
 **Claude.** The detector sends Claude Haiku 4.5 the article, its numbers and
 its recent edit summaries, and gets back a structured label and sentence. It
-asks about fresh bursts only, at most 20 an hour.
+asks about fresh bursts only, at most 10 an hour and 120 a day: about $0.15 a
+day. Each read logs the tokens it used.
 
 **The classifier.** It is an L2-regularized logistic regression, fit by
 Newton's method in numpy. Its features are the log of edits, editors and

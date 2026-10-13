@@ -77,7 +77,7 @@
     <div class="two-col">
       <al-bars view="classifier_weights" category="feature" value="weight" label="What pushes a burst toward news (+) or away (−)"></al-bars>
       <div class="al-card how">
-        <p><strong>Why a classifier, when Claude reads bursts?</strong> Claude reads at most 20 bursts an hour, the freshest. A logistic regression trained on its labels scores every burst, instantly and for free: Claude's judgment, distilled into six numbers.</p>
+        <p><strong>Why a classifier, when Claude reads bursts?</strong> Claude reads at most 10 bursts an hour, the freshest. A logistic regression trained on its labels scores every burst, instantly and for free: Claude's judgment, distilled into six numbers.</p>
         <p><strong>How it learns.</strong> A pipeline step refits it hourly on every burst Claude has labeled, and publishes the weights as a table, behind a quality gate: the model must beat always guessing the more common label. The burst detector reloads the weights every 15 minutes.</p>
         <p><strong>How it's checked.</strong> Agreement with Claude, above, counts only bursts scored before Claude labeled them, so it's accuracy on bursts the model hadn't seen.</p>
       </div>

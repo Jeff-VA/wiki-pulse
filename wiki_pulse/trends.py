@@ -24,7 +24,7 @@ MIN_EDITS, MIN_EDITORS = 6, 3  # fewer can't be a burst, however quiet the artic
 THRESHOLD = 4.0  # standard deviations above the usual count
 REPEAT_AFTER = timedelta(hours=2)  # sooner only if a burst grows half as surprising again
 RELOAD = timedelta(minutes=15)
-FRESH = timedelta(minutes=10)  # older bursts (a replay after a restart) don't spend Claude's budget
+FRESH = timedelta(minutes=2)  # older bursts (a replay after a restart) don't spend Claude's budget
 DEFAULT = (0.7, 1.2)  # usual 30-minute count for an article being edited (mean, std), until baselines exist
 
 
