@@ -228,6 +228,7 @@ services:
     <<: *app
     command: [rollups, --serve]
     depends_on: *after-setup
+    mem_limit: 1536m  # gold.article_hourly rewrites hours of per-article rows (titles, links) at once
 
   steps:  # pipelines.yaml: baselines, daily top articles, the news classifier
     <<: *app
