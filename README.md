@@ -135,7 +135,8 @@ SELECT * FROM lakehouse_sql('
   WITH recent AS (SELECT wiki, edit_count FROM edits WHERE event_ts >= now() - INTERVAL ''1'' HOUR),
        week AS (SELECT wiki, edit_count AS week_edits FROM edits WHERE event_ts >= now() - INTERVAL ''7'' DAY)
   SELECT recent.wiki, recent.edit_count, week.week_edits, recent.edit_count * 168.0 / week.week_edits AS pace
-  FROM recent JOIN week ON week.wiki = recent.wiki ORDER BY pace DESC LIMIT 10');
+  FROM recent JOIN week ON week.wiki = recent.wiki
+  WHERE week.week_edits >= 5000 ORDER BY pace DESC LIMIT 10');   -- the last hour against an average hour this week
 
 -- Export any of it
 COPY (SELECT * FROM gateway_view('edits_daily', 'days=30')) TO 'daily.csv' (HEADER);
