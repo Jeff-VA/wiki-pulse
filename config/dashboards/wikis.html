@@ -46,6 +46,20 @@
     <al-lines view="wiki_hourly" x="hour" y="$metric" series="wiki" colors="enwiki,dewiki,frwiki,eswiki,jawiki,ruwiki"></al-lines>
   </section>
 
+  <section class="al-section" aria-labelledby="daily-title">
+    <div class="al-head">
+      <div>
+        <h2 id="daily-title">Day by day</h2>
+        <p class="al-caption">Every Wikipedia: today live from the real-time tier, earlier days from Iceberg, merged into one line.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <al-param name="days" options="7=7 days,30=30 days,90=90 days,365=A year" value="30" label="Range"></al-param>
+      <al-param name="daily_metric" kind="select" label="Metric" view="edits_daily" options="edit_count,editors,revert_share"></al-param>
+    </div>
+    <al-lines view="edits_daily" x="day" y="$daily_metric" height="200"></al-lines>
+  </section>
+
   <section class="al-section" aria-labelledby="compare-title">
     <div class="al-head"><h2 id="compare-title">The 15 busiest, side by side</h2><span class="al-caption">over the same range</span></div>
     <div class="grid-2x2">

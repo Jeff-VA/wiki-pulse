@@ -63,6 +63,19 @@
               columns="flagged_at,url,language,peak_edits,peak_surprise,news_probability,reading,explanation"></al-table>
   </section>
 
+  <section class="al-section" aria-labelledby="reverts-title">
+    <div class="al-head">
+      <div>
+        <h2 id="reverts-title">More reverts than usual</h2>
+        <p class="al-caption">Each wiki's share of edits that undo other edits in the last hour, against its own last 7 days. Wikis with at least 100 edits in the hour.</p>
+      </div>
+    </div>
+    <div class="two-col">
+      <al-bars view="reverts_vs_usual" category="wiki" value="above_usual" label="Revert share above usual (points)"></al-bars>
+      <al-table view="reverts_vs_usual" columns="wiki,revert_share,usual_share,edit_count" label="Last hour against the last 7 days"></al-table>
+    </div>
+  </section>
+
   <section class="al-section" aria-labelledby="busiest-title">
     <div class="al-head"><h2 id="busiest-title">Busiest</h2></div>
     <div class="controls">

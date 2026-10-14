@@ -116,26 +116,34 @@ stand-ins, with the dashboards drawn in headless Chrome.
 
 ## Query it in SQL: DuckDB and DBeaver
 
-A DuckDB connection, in DBeaver or the DuckDB CLI, can query both ways in. Run
-[`tools/duckdb/setup.sql`](tools/duckdb/setup.sql) once, and have every session
-start with [`tools/duckdb/session.sql`](tools/duckdb/session.sql). In DBeaver,
-those two lines go in the connection's bootstrap queries.
+A DuckDB connection, in DBeaver, the DuckDB CLI or a notebook, has two ways
+in. Run [`tools/duckdb/setup.sql`](tools/duckdb/setup.sql) once, and start
+each session with [`tools/duckdb/session.sql`](tools/duckdb/session.sql). In
+DBeaver, its lines go in the connection's bootstrap queries. The engine
+writes both files: `agentic-lakehouse duckdb`.
 
 ```sql
 -- History: the Iceberg tables directly, as of the last flush (a few minutes behind)
 SELECT * FROM lake.gold.top_articles_daily ORDER BY day DESC, rank LIMIT 20;
 
--- Live: any view, answered by the gateway across both tiers, up to the second
-SELECT * FROM gateway_views();                                    -- what you can ask
-SELECT * FROM gateway_view('bursts_latest', 'hours=24');
+-- Live: a view, answered by the gateway across both tiers, up to the second
+SELECT * FROM gateway_views();                                  -- what you can ask
+SELECT * FROM gateway_view('reverts_vs_usual', 'hours=1');      -- a composed view
 
--- Export either
-COPY (SELECT * FROM gateway_view('wikis_now', 'minutes=1440')) TO 'busiest.csv' (HEADER);
+-- Live, without a view file: SQL written like a view, composed queries included
+SELECT * FROM lakehouse_sql('
+  WITH recent AS (SELECT wiki, edit_count FROM edits WHERE event_ts >= now() - INTERVAL ''1'' HOUR),
+       week AS (SELECT wiki, edit_count AS week_edits FROM edits WHERE event_ts >= now() - INTERVAL ''7'' DAY)
+  SELECT recent.wiki, recent.edit_count, week.week_edits, recent.edit_count * 168.0 / week.week_edits AS pace
+  FROM recent JOIN week ON week.wiki = recent.wiki ORDER BY pace DESC LIMIT 10');
+
+-- Export any of it
+COPY (SELECT * FROM gateway_view('edits_daily', 'days=30')) TO 'daily.csv' (HEADER);
 ```
 
-When a view returns no rows, DuckDB can't see its columns, so name them only
-when you expect rows (`SELECT *` always works). Treat `lake.*` as read-only:
-the flush, rollups and steps own those tables.
+A question the gateway can't answer comes back as one row, in a column named
+`error`. Treat `lake.*` as read-only: the flush, rollups and steps own those
+tables.
 
 ## License
 
