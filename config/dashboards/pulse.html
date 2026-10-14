@@ -14,7 +14,7 @@
   nav a[aria-current="page"] { color: var(--text-primary); font-weight: 600; }
   nav a:hover { color: var(--text-primary); }
   .controls { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
   .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 12px; }
   footer { margin-top: 32px; color: var(--muted); font-size: 12px; }
 </style>
@@ -36,6 +36,7 @@
       <al-kpi view="pulse_total" value="edit_count" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
       <al-kpi view="pulse_total" value="editors" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
       <al-kpi view="pulse_total" value="new_articles" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
+      <al-kpi view="pulse_total" value="human_share" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
       <al-kpi view="pulse_total" value="revert_share" compare="from_minutes_ago=120&amp;to_minutes_ago=60"></al-kpi>
       <al-freshness dataset="edits"></al-freshness>
     </div>

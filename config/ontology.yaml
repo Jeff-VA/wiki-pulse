@@ -29,7 +29,12 @@ models:
         type: string
         label: Editor
         description: Who made the edit, broadly; bot, anonymous (an IP address or temporary account) or registered.
-        sql: "CASE WHEN is_bot = true THEN 'bot' WHEN is_anonymous = true THEN 'anonymous' ELSE 'registered' END"
+        sql: "{{ editor_type() }}"  # config/macros/default.sql
+      - name: site
+        type: string
+        label: Site
+        description: The site the article is on, e.g. en.wikipedia.org.
+        sql: "{{ url_host('url') }}"  # Trino has its own version, in config/macros/trino.sql
     metrics:
       - name: edit_count
         description: Number of edits.
@@ -55,6 +60,11 @@ models:
         agg: count
         filters: ["is_bot = true"]
         label: Bot edits
+      - name: human_edits
+        description: Edits by people with an account; not bots, not anonymous.
+        agg: count
+        filters: ["{{ human_edit() }}"]
+        label: Human edits
       - name: anonymous_edits
         description: Edits by editors without an account (an IP address or a temporary account).
         agg: count
@@ -77,6 +87,13 @@ models:
         numerator: bot_edits
         denominator: edit_count
         label: Bot share
+        format: percent
+      - name: human_share
+        description: Share of edits made by people with an account.
+        type: ratio
+        numerator: human_edits
+        denominator: edit_count
+        label: Human share
         format: percent
       - name: anonymous_share
         description: Share of edits made without an account.

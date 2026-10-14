@@ -53,6 +53,7 @@ models are versioned, quality-gated and queryable like any other data.
 | Claude's read of a burst | [`wiki_pulse/explain.py`](wiki_pulse/explain.py) |
 | The news classifier | [`wiki_pulse/classifier.py`](wiki_pulse/classifier.py), `news_classifier` in [`pipelines.yaml`](config/pipelines.yaml) |
 | Metrics and dimensions | [`config/ontology.yaml`](config/ontology.yaml) |
+| Business definitions, written once: `editor_type()`, `human_edit()`, `url_host()` (Trino's own version) | [`config/macros/`](config/macros/) |
 | Rollups, steps and their quality gates | [`storage.yaml`](config/storage.yaml), [`pipelines.yaml`](config/pipelines.yaml), [`quality_rules.yaml`](config/quality_rules.yaml) |
 | Views and dashboards | [`config/views/`](config/views/), [`config/dashboards/`](config/dashboards/) |
 
