@@ -114,6 +114,29 @@ http://127.0.0.1:4200 shows the flush, rollup and step runs.
 classifier and Claude's prompt, then every view and dashboard on DuckDB
 stand-ins, with the dashboards drawn in headless Chrome.
 
+## Query it in SQL: DuckDB and DBeaver
+
+A DuckDB connection, in DBeaver or the DuckDB CLI, can query both ways in. Run
+[`tools/duckdb/setup.sql`](tools/duckdb/setup.sql) once, and have every session
+start with [`tools/duckdb/session.sql`](tools/duckdb/session.sql). In DBeaver,
+those two lines go in the connection's bootstrap queries.
+
+```sql
+-- History: the Iceberg tables directly, as of the last flush (a few minutes behind)
+SELECT * FROM lake.gold.top_articles_daily ORDER BY day DESC, rank LIMIT 20;
+
+-- Live: any view, answered by the gateway across both tiers, up to the second
+SELECT * FROM gateway_views();                                    -- what you can ask
+SELECT * FROM gateway_view('bursts_latest', 'hours=24');
+
+-- Export either
+COPY (SELECT * FROM gateway_view('wikis_now', 'minutes=1440')) TO 'busiest.csv' (HEADER);
+```
+
+When a view returns no rows, DuckDB can't see its columns, so name them only
+when you expect rows (`SELECT *` always works). Treat `lake.*` as read-only:
+the flush, rollups and steps own those tables.
+
 ## License
 
 Copyright (c) 2026 Jeffrey Van Anderson. All rights reserved. The code is
