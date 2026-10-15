@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from wiki_pulse.edits import from_recentchange, is_anonymous
+from wiki_pulse.edits import KNOWN_FIELDS, from_recentchange, is_anonymous
 
 
 def change(**fields) -> dict:
@@ -83,6 +83,28 @@ def test_long_summaries_are_cut_and_a_missing_link_falls_back_to_the_title_url()
     edit = from_recentchange(change(comment="x" * 500, meta={}))
     assert len(edit["edit_summary"]) == 300
     assert edit["url"] == "https://en.wikipedia.org/wiki/Taylor_Swift"
+
+
+def test_a_field_the_feed_stops_sending_becomes_null_not_a_default():
+    edit = from_recentchange({k: v for k, v in change().items() if k not in ("bot", "minor", "length", "user", "comment")})
+    for column in ("is_bot", "is_minor", "bytes_delta", "page_bytes", "editor", "is_anonymous", "edit_summary", "is_revert"):
+        assert edit[column] is None, column  # so the drift agent sees the column fade
+
+
+def test_a_field_the_feed_starts_sending_passes_through():
+    edit = from_recentchange(change(user_rights="autoconfirmed", patrolled=True, revision={"old": 1, "new": 2}))
+    assert edit["user_rights"] == "autoconfirmed"  # new upstream: Iceberg gets a column, the drift agent a signal
+    assert "patrolled" not in edit and "revision" not in edit  # known, and left out on purpose
+
+
+def test_todays_feed_passes_nothing_through():
+    # The fields an article edit carried in October 2026, sampled from the live feed.
+    full = change(
+        **{"$schema": "/mediawiki/recentchange/1.0.0", "id": 1, "parsedcomment": "", "patrolled": True,
+           "revision": {"old": 1, "new": 2}, "notify_url": "", "server_url": "", "server_script_path": "/w"}
+    )  # fmt: skip
+    assert set(full) <= KNOWN_FIELDS
+    assert set(from_recentchange(full)) == set(from_recentchange(change()))
 
 
 @pytest.mark.parametrize(
