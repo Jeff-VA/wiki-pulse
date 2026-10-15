@@ -14,3 +14,6 @@
 
 {# The site a URL is on, e.g. en.wikipedia.org. #}
 {% macro url_host(column) %}regexp_extract({{ column }}, '^https?://([^/]+)', 1){% endmacro %}
+
+{# An edit made from a Wikimedia temporary account: an automatically created account named ~... for editors who aren't logged in, counted as anonymous. True when producers flag it (is_temporary, from October 2026) or the editor's name starts with '~'. So it holds for older rows in both tiers: Iceberg has no flag for them, and Pinot reads a flag it didn't have as false. #}
+{% macro temporary_account_edit() %}coalesce(is_temporary, false) OR editor LIKE '~%'{% endmacro %}

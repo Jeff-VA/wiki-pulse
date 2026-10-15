@@ -40,6 +40,7 @@ datasets:
       - {name: page_bytes, type: long}  # the article's size after the edit
       - {name: edit_summary, type: string}  # the editor's comment, up to 300 characters
       - {name: url, type: string}  # the article
+      - {name: is_temporary, type: boolean}
     realtime:
       table: edits
       retention_days: 2

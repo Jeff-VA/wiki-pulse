@@ -35,6 +35,11 @@ models:
         label: Site
         description: The site the article is on, e.g. en.wikipedia.org.
         sql: "{{ url_host('url') }}"  # Trino has its own version, in config/macros/trino.sql
+      - name: temporary_account
+        type: boolean
+        label: Temporary account
+        description: "Whether the edit was made from a Wikimedia temporary account: an automatically created account, named ~..., for editors who aren't logged in. These are a subset of anonymous editors; the rest edit from an IP address. Producers started sending the is_temporary flag in October 2026; the editor name starting with '~' identifies older ones too."
+        sql: "{{ temporary_account_edit() }}"
     metrics:
       - name: edit_count
         description: Number of edits.
@@ -110,6 +115,12 @@ models:
         label: Revert share
         format: percent
         better: lower
+      - name: temporary_account_edits
+        description: Edits made from temporary accounts (named ~...), a subset of anonymous edits. The other anonymous edits come from IP addresses. Counts an edit when producers flag it (from October 2026) or the editor's name starts with '~'.
+        agg: count
+        filters: ["{{ temporary_account_edit() }}"]
+        label: Temporary-account edits
+        format: integer
 
   - name: trends
     description: >
