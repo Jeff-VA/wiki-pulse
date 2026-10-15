@@ -1,5 +1,6 @@
 """The project's config, views and dashboards, checked without the Docker stack."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,9 @@ def test_the_config_views_and_dashboards_check_out():
 
 def test_every_view_returns_rows(gateway):
     for name in gateway.views:
-        assert gateway.view(name).rows, f"view {name} returned no rows on simulated events"
+        # Daily tables are built from complete hours, so in the day's first hour today has none yet.
+        params = {"days_ago": 1} if "days_ago" in gateway.views[name].params and datetime.now(UTC).hour == 0 else {}
+        assert gateway.view(name, params).rows, f"view {name} returned no rows on simulated events"
 
 
 @pytest.mark.skipif(find_chrome() is None, reason="needs Chrome or Chromium")
