@@ -51,6 +51,7 @@ def from_recentchange(raw: dict) -> dict | None:
         "editor": editor,
         "is_bot": raw.get("bot"),
         "is_anonymous": None if editor is None else is_anonymous(editor),
+        "is_temporary": None if editor is None else editor.startswith("~"),  # a temporary account, also anonymous
         "is_minor": raw.get("minor"),
         "is_revert": None if summary is None else bool(REVERT.search(summary)),
         "bytes_delta": None if length is None else (length.get("new") or 0) - (length.get("old") or 0),

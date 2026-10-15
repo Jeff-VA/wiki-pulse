@@ -36,6 +36,7 @@ def test_an_article_edit_becomes_an_edit():
         "editor": "Example",
         "is_bot": False,
         "is_anonymous": False,
+        "is_temporary": False,
         "is_minor": True,
         "is_revert": False,
         "bytes_delta": 250,
@@ -87,7 +88,7 @@ def test_long_summaries_are_cut_and_a_missing_link_falls_back_to_the_title_url()
 
 def test_a_field_the_feed_stops_sending_becomes_null_not_a_default():
     edit = from_recentchange({k: v for k, v in change().items() if k not in ("bot", "minor", "length", "user", "comment")})
-    for column in ("is_bot", "is_minor", "bytes_delta", "page_bytes", "editor", "is_anonymous", "edit_summary", "is_revert"):
+    for column in ("is_bot", "is_minor", "bytes_delta", "page_bytes", "editor", "is_anonymous", "is_temporary", "edit_summary", "is_revert"):
         assert edit[column] is None, column  # so the drift agent sees the column fade
 
 
@@ -105,6 +106,12 @@ def test_todays_feed_passes_nothing_through():
     )  # fmt: skip
     assert set(full) <= KNOWN_FIELDS
     assert set(from_recentchange(full)) == set(from_recentchange(change()))
+
+
+def test_a_temporary_account_is_anonymous_and_says_so():
+    edit = from_recentchange(change(user="~2026-12345-67"))
+    assert (edit["is_anonymous"], edit["is_temporary"]) == (True, True)
+    assert from_recentchange(change(user="203.0.113.7"))["is_temporary"] is False  # anonymous, by IP address
 
 
 @pytest.mark.parametrize(
