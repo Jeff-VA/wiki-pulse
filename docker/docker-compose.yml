@@ -223,6 +223,7 @@ services:
     <<: *app
     command: [flush, --serve]
     depends_on: *after-setup
+    mem_limit: 1536m  # after the laptop sleeps, the Kafka client prefetches hours of backlog at once
 
   rollups:
     <<: *app
