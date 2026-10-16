@@ -54,6 +54,7 @@ def _edit(rng, wiki, language, title, editor, ts, first):
         "editor": editor,
         "is_bot": editor in BOTS,
         "is_anonymous": editor[0].isdigit() or editor.startswith("~"),
+        "is_temporary": editor.startswith("~"),
         "is_minor": rng.random() < 0.3,
         "is_revert": summary.startswith("Reverted"),
         "bytes_delta": delta,
