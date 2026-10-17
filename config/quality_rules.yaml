@@ -34,6 +34,18 @@ rules:
       - {type: range, column: rank, min: 1, max: 50}
       - {type: freshness, max_lag_hours: 26}  # day is the day's start
 
+  - table: gold.classifier_daily
+    checks:
+      - {type: row_count, min: 1}
+      - {type: unique, columns: [event_ts]}  # one row per day
+      - type: expression
+        description: the confusion matrix covers exactly the evaluated bursts
+        sql: "true_positives + false_positives + false_negatives + true_negatives = evaluated_bursts"
+      - type: expression
+        description: a burst is evaluated only if scored and labeled, and labeled only if flagged
+        sql: "evaluated_bursts <= scored_bursts AND evaluated_bursts <= labeled_bursts AND labeled_bursts <= flagged_bursts"
+      - {type: freshness, max_lag_hours: 26}  # event_ts is the day's start
+
   - table: gold.news_classifier
     checks:
       - {type: not_null, columns: [feature, weight, center, scale]}

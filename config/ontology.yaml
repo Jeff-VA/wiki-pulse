@@ -142,13 +142,13 @@ models:
           Claude's label for the burst: news (a real-world event), edit war,
           routine or unclear; "not read" when Claude didn't read it (no API key,
           or its hourly budget was spent).
-        sql: "coalesce(claude_label, 'not read')"
+        sql: "{{ claude_reading() }}"
       - {name: explanation, type: string, label: What's happening, description: Claude's one sentence about the burst.}
       - name: classifier_says
         type: string
         label: Classifier's call
         description: news when the classifier gives a probability of 0.5 or more, otherwise other; untrained until it has enough labels.
-        sql: "CASE WHEN p_news IS NULL THEN 'untrained' WHEN p_news >= 0.5 THEN 'news' ELSE 'other' END"
+        sql: "CASE WHEN p_news IS NULL THEN 'untrained' WHEN {{ called_news() }} THEN 'news' ELSE 'other' END"
     metrics:
       - name: bursts
         description: Number of bursts flagged.
@@ -205,15 +205,14 @@ models:
       - name: judged_bursts
         description: Bursts both the classifier and Claude judged (leaving out those Claude found unclear).
         agg: count
-        filters: ["p_news IS NOT NULL", "claude_label IN ('news', 'edit war', 'routine')"]
+        filters: ["{{ judged_by_both() }}"]
         label: Judged by both
       - name: agreed_bursts
         description: Bursts where the classifier's call (news at a probability of 0.5 or more) matched Claude's label.
         agg: count
         filters:
-          - "p_news IS NOT NULL"
-          - "claude_label IN ('news', 'edit war', 'routine')"
-          - "(p_news >= 0.5 AND claude_label = 'news') OR (p_news < 0.5 AND claude_label <> 'news')"
+          - "{{ judged_by_both() }}"
+          - "({{ called_news() }} AND claude_label = 'news') OR (NOT ({{ called_news() }}) AND claude_label <> 'news')"
         label: Agreed
       - name: agreement
         description: >
@@ -226,3 +225,165 @@ models:
         label: Agreement with Claude
         format: percent
         better: higher
+
+  - name: classifier_eval
+    description: >
+      How good the news classifier is, judged against Claude's labels: the
+      confusion matrix, precision, recall and the Brier score on the bursts both
+      judged, and how many bursts Claude labeled at all. The detector scores each
+      burst with the model trained before it, so these are out-of-sample. Labeled
+      bursts are few, and Claude reads only the first fresh bursts of each hour,
+      so read every rate alongside its counts and label_coverage.
+    source: trends
+    time_dimension: event_ts
+    dimensions:
+      - {name: event_ts, type: timestamp, label: Time}
+      - {name: wiki, type: string, label: Wiki}
+      - {name: language, type: string, label: Language}
+      - name: reading
+        type: string
+        label: Claude's read
+        description: Claude's label for the burst (news, edit war, routine or unclear), or "not read".
+        sql: "{{ claude_reading() }}"
+      - name: classifier_says
+        type: string
+        label: Classifier's call
+        description: news when the classifier gives a probability of 0.5 or more, otherwise other; untrained until it has enough labels.
+        sql: "CASE WHEN p_news IS NULL THEN 'untrained' WHEN {{ called_news() }} THEN 'news' ELSE 'other' END"
+      - name: score_band
+        type: string
+        label: News probability
+        description: >
+          The classifier's probability that the burst is news, in bands, to check
+          calibration: within a band, the share Claude labeled news should be
+          about the band's probability. "unscored" before the classifier was trained.
+        sql: >-
+          CASE WHEN p_news IS NULL THEN 'unscored' WHEN p_news < 0.1 THEN '0-10%'
+          WHEN p_news < 0.3 THEN '10-30%' WHEN p_news < 0.5 THEN '30-50%'
+          WHEN p_news < 0.7 THEN '50-70%' ELSE '70-100%' END
+      - name: hour_of_day
+        type: number
+        label: Hour (UTC)
+        description: >
+          The hour of the day the burst was flagged, 0 to 23 UTC. Claude reads at
+          most 10 bursts an hour, the first that arrive, so its coverage varies
+          through the day.
+        sql: "hour(event_ts)"
+    metrics:
+      - name: flagged_bursts
+        description: Number of bursts flagged, labeled or not.
+        agg: count
+        label: Bursts
+      - name: labeled_bursts
+        description: Bursts Claude read and labeled (any label, unclear included).
+        agg: count
+        filters: ["claude_label IS NOT NULL"]
+        label: Labeled by Claude
+      - name: label_coverage
+        description: >
+          Share of bursts Claude labeled. The classifier learns from and is judged
+          on this sample only; where coverage is low, the sample may not represent
+          the bursts the classifier scores unseen.
+        type: ratio
+        numerator: labeled_bursts
+        denominator: flagged_bursts
+        label: Label coverage
+        format: percent
+      - name: scored_bursts
+        description: Bursts the classifier scored (none before it was first trained).
+        agg: count
+        filters: ["p_news IS NOT NULL"]
+        label: Scored
+      - name: evaluated_bursts
+        description: Bursts the classifier scored and Claude labeled news, edit war or routine; every rate below is over these.
+        agg: count
+        filters: ["{{ judged_by_both() }}"]
+        label: Evaluated
+      - name: true_positives
+        description: Evaluated bursts the classifier called news (probability 0.5 or more) and Claude labeled news.
+        agg: count
+        filters: ["{{ judged_by_both() }}", "{{ called_news() }}", "claude_label = 'news'"]
+        label: News caught
+      - name: false_positives
+        description: Evaluated bursts the classifier called news that Claude labeled an edit war or routine.
+        agg: count
+        filters: ["{{ judged_by_both() }}", "{{ called_news() }}", "claude_label <> 'news'"]
+        label: False alarms
+      - name: false_negatives
+        description: Evaluated bursts Claude labeled news that the classifier didn't call news.
+        agg: count
+        filters: ["{{ judged_by_both() }}", "NOT ({{ called_news() }})", "claude_label = 'news'"]
+        label: News missed
+      - name: true_negatives
+        description: Evaluated bursts the classifier didn't call news and Claude labeled an edit war or routine.
+        agg: count
+        filters: ["{{ judged_by_both() }}", "NOT ({{ called_news() }})", "claude_label <> 'news'"]
+        label: Correctly not news
+      - name: news_calls
+        description: Evaluated bursts the classifier called news, right or wrong (true positives plus false positives).
+        agg: count
+        filters: ["{{ judged_by_both() }}", "{{ called_news() }}"]
+        label: Called news
+      - name: evaluated_news
+        description: Evaluated bursts Claude labeled news (true positives plus false negatives).
+        agg: count
+        filters: ["{{ judged_by_both() }}", "claude_label = 'news'"]
+        label: News (Claude)
+      - name: news_precision
+        description: Of the evaluated bursts the classifier called news, the share Claude labeled news. Empty when it called none.
+        type: ratio
+        numerator: true_positives
+        denominator: news_calls
+        label: Precision
+        format: percent
+        better: higher
+      - name: news_recall
+        description: Of the evaluated bursts Claude labeled news, the share the classifier called news.
+        type: ratio
+        numerator: true_positives
+        denominator: evaluated_news
+        label: Recall
+        format: percent
+        better: higher
+      - name: news_base_rate
+        description: >
+          Share of evaluated bursts Claude labeled news. Read precision against it:
+          a classifier that guesses at random has precision equal to the base rate.
+        type: ratio
+        numerator: evaluated_news
+        denominator: evaluated_bursts
+        label: News among evaluated
+        format: percent
+      - name: squared_error
+        description: >
+          Sum, over evaluated bursts, of the squared gap between the classifier's
+          probability and the outcome (1 for news, 0 otherwise). A building block
+          for brier_score that adds up across days and tiers.
+        agg: sum
+        sql: "(p_news - {{ news_outcome() }}) * (p_news - {{ news_outcome() }})"
+        filters: ["{{ judged_by_both() }}"]
+        label: Squared error (sum)
+      - name: brier_score
+        description: >
+          Mean squared error of the classifier's probabilities on evaluated bursts:
+          0 is perfect. Always answering the base rate scores base rate × (1 − base
+          rate), about 0.07 when 8% are news; a useful model scores below that.
+        type: ratio
+        numerator: squared_error
+        denominator: evaluated_bursts
+        label: Brier score
+        better: lower
+      - name: p_news_when_news
+        description: The classifier's average probability on evaluated bursts Claude labeled news.
+        agg: avg
+        sql: p_news
+        filters: ["{{ judged_by_both() }}", "claude_label = 'news'"]
+        label: Probability given to news
+        format: percent
+      - name: p_news_when_other
+        description: The classifier's average probability on evaluated bursts Claude labeled an edit war or routine.
+        agg: avg
+        sql: p_news
+        filters: ["{{ judged_by_both() }}", "claude_label <> 'news'"]
+        label: Probability given to other
+        format: percent

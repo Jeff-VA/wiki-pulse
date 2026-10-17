@@ -17,3 +17,15 @@
 
 {# An edit made from a Wikimedia temporary account: an automatically created account named ~... for editors who aren't logged in, counted as anonymous. Uses the is_temporary flag where producers send it (from around October 2026). For older rows it falls back to the editor name starting with '~'. #}
 {% macro temporary_account_edit() %}coalesce(is_temporary, editor LIKE '~%'){% endmacro %}
+
+{# Claude's label for a burst (news, edit war, routine or unclear), or 'not read' when Claude didn't read it. #}
+{% macro claude_reading() %}coalesce(claude_label, 'not read'){% endmacro %}
+
+{# The news classifier calls a burst news: a probability of 0.5 or more. The decision threshold, in one place. #}
+{% macro called_news() %}p_news >= 0.5{% endmacro %}
+
+{# A burst the classifier can be judged on: it scored it, and Claude labeled it news, edit war or routine (an unclear or unread burst has no answer to compare with). #}
+{% macro judged_by_both() %}(p_news IS NOT NULL AND claude_label IN ('news', 'edit war', 'routine')){% endmacro %}
+
+{# 1 for a burst Claude labeled news, 0 otherwise: the outcome the classifier's probability is scored against. #}
+{% macro news_outcome() %}CASE WHEN claude_label = 'news' THEN 1.0 ELSE 0.0 END{% endmacro %}

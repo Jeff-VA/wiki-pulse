@@ -40,3 +40,18 @@ rollups:
     lookback_hours: 3
     backfill_days: 2
     every_minutes: 15
+
+  - table: gold.classifier_daily
+    description: >
+      Each day's judging of the news classifier against Claude's labels
+      (classifier_eval): bursts flagged, labeled, scored and evaluated, the
+      confusion matrix and the squared error. Counts and sums, not rates, so any
+      span of days adds up: precision is the sum of true_positives over the sum
+      of true_positives + false_positives, the Brier score squared_error over
+      evaluated_bursts.
+    query:
+      metrics: [flagged_bursts, labeled_bursts, scored_bursts, evaluated_bursts, true_positives, false_positives, false_negatives, true_negatives, squared_error]
+      grain: day
+    lookback_hours: 24
+    backfill_days: 7
+    every_minutes: 60
