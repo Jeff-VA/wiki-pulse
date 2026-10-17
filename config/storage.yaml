@@ -55,3 +55,18 @@ rollups:
     lookback_hours: 24
     backfill_days: 7
     every_minutes: 60
+
+  - table: gold.wiki_daily_content
+    description: >
+      Each wiki's day of editing by what changed (edit_content): bytes added and
+      removed, and the edits marked minor, saved without a summary or removing
+      1,000 bytes or more, as counts that add up over any span of days and wikis.
+      The median edit size is the day's own, from Trino's approximate percentile:
+      read it per day and wiki, but don't average it across them.
+    query:
+      metrics: [all_edits, bytes_added, bytes_removed, minor_edits, large_removals, unsummarized_edits, median_edit_size]
+      dimensions: [wiki, language]
+      grain: day
+    lookback_hours: 24
+    backfill_days: 7
+    every_minutes: 60

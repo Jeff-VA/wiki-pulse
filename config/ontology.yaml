@@ -122,6 +122,138 @@ models:
         label: Temporary-account edits
         format: integer
 
+  - name: edit_content
+    description: >
+      What the edits changed, not just how many there were: bytes added and
+      removed (kept apart, unlike net_bytes), how big a typical edit is, and the
+      shares of edits marked minor, saved without a summary, or removing 1,000
+      bytes or more. Slice by edit size, article size, whether text was added or
+      removed, and who edited. Use it to tell substantive writing from
+      maintenance, and large anonymous removals (a vandalism signal) from the rest.
+    source: edits
+    time_dimension: event_ts
+    dimensions:
+      - {name: event_ts, type: timestamp, label: Time}
+      - {name: wiki, type: string, label: Wiki}
+      - {name: language, type: string, label: Language}
+      - {name: kind, type: string, label: Kind, description: "edit, or new for an article's first edit."}
+      - name: editor_type
+        type: string
+        label: Editor
+        description: Who made the edit, broadly; bot, anonymous (an IP address or temporary account) or registered.
+        sql: "{{ editor_type() }}"
+      - name: marked_minor
+        type: string
+        label: Minor
+        description: minor when the editor marked the edit minor (a typo or formatting fix, by their own account), otherwise not minor.
+        sql: "CASE WHEN is_minor = true THEN 'minor' ELSE 'not minor' END"
+      - name: change
+        type: string
+        label: Change
+        description: Whether the edit made the article longer (added), shorter (removed), or left its size alone (no change).
+        sql: >-
+          CASE WHEN bytes_delta > 0 THEN 'added' WHEN bytes_delta < 0 THEN 'removed'
+          WHEN bytes_delta = 0 THEN 'no change' ELSE 'unknown' END
+      - name: edit_size
+        type: string
+        label: Edit size
+        description: >
+          How many bytes the edit changed, added or removed, in bands of ten: in
+          October 2026, 5% changed none, 22% under 10, 44% under 100, 22% under
+          1,000, 5% under 10,000 and under 1% more.
+        sql: >-
+          CASE WHEN bytes_delta IS NULL THEN 'unknown' WHEN bytes_delta = 0 THEN 'none'
+          WHEN abs(bytes_delta) < 10 THEN '1-9 B' WHEN abs(bytes_delta) < 100 THEN '10-99 B'
+          WHEN abs(bytes_delta) < 1000 THEN '100-999 B' WHEN abs(bytes_delta) < 10000 THEN '1-10 kB'
+          ELSE '10 kB+' END
+      - name: article_size
+        type: string
+        label: Article size
+        description: >
+          The article's size after the edit: stub under 2 kB, short under 10 kB,
+          medium under 50 kB, long beyond. A median edited article is about 9.5 kB.
+        sql: >-
+          CASE WHEN page_bytes IS NULL THEN 'unknown' WHEN page_bytes < 2000 THEN 'stub (<2 kB)'
+          WHEN page_bytes < 10000 THEN 'short (2-10 kB)' WHEN page_bytes < 50000 THEN 'medium (10-50 kB)'
+          ELSE 'long (50 kB+)' END
+    metrics:
+      - name: all_edits
+        description: Number of edits; the denominator of this model's shares.
+        agg: count
+        label: Edits
+      - name: bytes_added
+        description: Bytes added by the edits that made articles longer.
+        agg: sum
+        sql: bytes_delta
+        filters: ["bytes_delta > 0"]
+        label: Bytes added
+        format: integer
+      - name: bytes_removed
+        description: Bytes removed by the edits that made articles shorter, as a positive number.
+        agg: sum
+        sql: abs(bytes_delta)
+        filters: ["bytes_delta < 0"]
+        label: Bytes removed
+        format: integer
+      - name: median_edit_size
+        description: >
+          The median number of bytes an edit changed, added or removed. Exact on
+          DuckDB, approximate on Trino and Pinot; a percentile can't be combined
+          across tiers or days, so the newest minutes may be left out (see coverage).
+        agg: percentile
+        percentile: 0.5
+        sql: abs(bytes_delta)
+        label: Median edit size
+        unit: B
+      - name: p90_edit_size
+        description: Bytes changed by an edit at the 90th percentile; the size only the biggest tenth of edits exceed. Approximate like median_edit_size.
+        agg: percentile
+        percentile: 0.9
+        sql: abs(bytes_delta)
+        label: 90th percentile edit size
+        unit: B
+      - name: minor_edits
+        description: Edits their editors marked minor.
+        agg: count
+        filters: ["is_minor = true"]
+        label: Minor edits
+      - name: minor_share
+        description: Share of edits marked minor.
+        type: ratio
+        numerator: minor_edits
+        denominator: all_edits
+        label: Minor share
+        format: percent
+      - name: large_removals
+        description: Edits removing 1,000 bytes or more.
+        agg: count
+        filters: ["{{ large_removal() }}"]
+        label: Large removals
+      - name: large_removal_share
+        description: >
+          Share of edits removing 1,000 bytes or more. Higher among anonymous
+          editors than registered ones; few are marked as reverts, so most are
+          blanking, vandalism or trims rather than its clean-up.
+        type: ratio
+        numerator: large_removals
+        denominator: all_edits
+        label: Large-removal share
+        format: percent
+        better: lower
+      - name: unsummarized_edits
+        description: Edits saved without an edit summary.
+        agg: count
+        filters: ["{{ no_summary() }}"]
+        label: Without a summary
+      - name: no_summary_share
+        description: Share of edits saved without an edit summary, which leaves other editors (and Claude) less to go on.
+        type: ratio
+        numerator: unsummarized_edits
+        denominator: all_edits
+        label: No-summary share
+        format: percent
+        better: lower
+
   - name: trends
     description: >
       Bursts: articles getting far more edits than usual, flagged by the burst

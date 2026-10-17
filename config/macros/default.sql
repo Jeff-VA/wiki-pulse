@@ -18,6 +18,12 @@
 {# An edit made from a Wikimedia temporary account: an automatically created account named ~... for editors who aren't logged in, counted as anonymous. Uses the is_temporary flag where producers send it (from around October 2026). For older rows it falls back to the editor name starting with '~'. #}
 {% macro temporary_account_edit() %}coalesce(is_temporary, editor LIKE '~%'){% endmacro %}
 
+{# An edit that removes 1,000 bytes or more: blanking, vandalism or its clean-up, or a large trim. About 1% of edits. #}
+{% macro large_removal() %}bytes_delta <= -1000{% endmacro %}
+
+{# An edit saved without a summary of what it changed (the feed sends an empty one). #}
+{% macro no_summary() %}(edit_summary IS NULL OR edit_summary = ''){% endmacro %}
+
 {# Claude's label for a burst (news, edit war, routine or unclear), or 'not read' when Claude didn't read it. #}
 {% macro claude_reading() %}coalesce(claude_label, 'not read'){% endmacro %}
 

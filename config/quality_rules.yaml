@@ -46,6 +46,18 @@ rules:
         sql: "evaluated_bursts <= scored_bursts AND evaluated_bursts <= labeled_bursts AND labeled_bursts <= flagged_bursts"
       - {type: freshness, max_lag_hours: 26}  # event_ts is the day's start
 
+  - table: gold.wiki_daily_content
+    checks:
+      - {type: row_count, min: 1}
+      - {type: unique, columns: [event_ts, wiki]}  # one row per wiki and day
+      - {type: not_null, columns: [wiki, all_edits]}
+      - type: expression
+        description: a wiki's minor, unsummarized and large-removing edits can't outnumber its edits
+        sql: "minor_edits <= all_edits AND unsummarized_edits <= all_edits AND large_removals <= all_edits"
+      - {type: range, column: bytes_added, min: 0}
+      - {type: range, column: bytes_removed, min: 0}
+      - {type: freshness, max_lag_hours: 26}  # event_ts is the day's start
+
   - table: gold.news_classifier
     checks:
       - {type: not_null, columns: [feature, weight, center, scale]}
