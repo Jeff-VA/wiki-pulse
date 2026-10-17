@@ -662,3 +662,22 @@ models:
         denominator: burst_flags
         label: Revert-heavy share
         format: percent
+
+# Lookups: small tables keyed by a dimension, whose attributes every model with
+# that dimension gains (engine v0.10.0). Each compiles into the query as a CASE
+# over the key, so it slices every metric exactly, on both tiers. The rows say
+# what's true now and apply to all of history.
+lookups:
+  - name: wikis
+    description: Each Wikipedia's size, by its edits over the last 7 days (the wiki_sizes step).
+    key: wiki
+    table: gold.wiki_sizes
+    refresh_minutes: 60
+    attributes:
+      - name: size_tier
+        type: string
+        label: Wiki size
+        description: >
+          large (100,000 edits a week or more), medium (10,000 or more) or small,
+          by the wiki's last 7 days; unknown for a wiki the step hasn't seen yet.
+        missing: unknown

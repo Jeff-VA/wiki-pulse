@@ -58,6 +58,23 @@ steps:
     time_column: day
     every_minutes: 30
 
+  - name: wiki_sizes
+    output: gold.wiki_sizes
+    description: >
+      Each Wikipedia's size, by its edits over the last 7 days: large at 100,000
+      or more, medium at 10,000 or more, small below. The ontology's `wikis`
+      lookup reads it, so every model with a wiki can be sliced by size tier.
+    sql: |
+      SELECT wiki,
+             CASE WHEN sum(edit_count) >= 100000 THEN 'large'
+                  WHEN sum(edit_count) >= 10000 THEN 'medium'
+                  ELSE 'small' END AS size_tier,
+             sum(edit_count) AS weekly_edits
+      FROM gold.wiki_hourly
+      WHERE event_ts >= now() - INTERVAL '7' DAY
+      GROUP BY wiki
+    every_minutes: 60
+
   - name: news_classifier
     output: gold.news_classifier
     description: >

@@ -58,6 +58,12 @@ rules:
       - {type: range, column: bytes_removed, min: 0}
       - {type: freshness, max_lag_hours: 26}  # event_ts is the day's start
 
+  - table: gold.wiki_sizes
+    checks:
+      - {type: row_count, min: 1}
+      - {type: unique, columns: [wiki]}  # a lookup's keys are unique
+      - {type: not_null, columns: [wiki, size_tier]}
+
   - table: gold.news_classifier
     checks:
       - {type: not_null, columns: [feature, weight, center, scale]}
