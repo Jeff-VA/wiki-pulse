@@ -1,4 +1,4 @@
 # The engine, pinned to a release. To upgrade, change the version in both places.
-agentic-lakehouse @ https://github.com/Jeff-VA/agentic-lakehouse/releases/download/v0.7.0/agentic_lakehouse-0.7.0-py3-none-any.whl
+agentic-lakehouse @ https://github.com/Jeff-VA/agentic-lakehouse/releases/download/v0.7.1/agentic_lakehouse-0.7.1-py3-none-any.whl
 # The news classifier's arithmetic (wiki_pulse/classifier.py)
 numpy>=2.0
