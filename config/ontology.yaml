@@ -519,3 +519,146 @@ models:
         filters: ["{{ judged_by_both() }}", "claude_label <> 'news'"]
         label: Probability given to other
         format: percent
+
+  - name: burst_intensity
+    description: >
+      How big and how unusual bursts are, to see what the burst detector flags
+      and whether it's tuned well: the spread of surprise, edits against what's
+      usual, how concentrated the editing is, and how many bursts sit at the
+      detector's 6-edit minimum or are mostly reverts. Each row is a flag: an
+      article that keeps growing is flagged again once it's half as surprising
+      again, so these count flags, not distinct bursts (burst_articles in the
+      trends model counts articles).
+    source: trends
+    time_dimension: event_ts
+    dimensions:
+      - {name: event_ts, type: timestamp, label: Time}
+      - {name: wiki, type: string, label: Wiki}
+      - {name: language, type: string, label: Language}
+      - name: reading
+        type: string
+        label: Claude's read
+        description: Claude's label for the burst (news, edit war, routine or unclear), or "not read".
+        sql: "{{ claude_reading() }}"
+      - name: surprise_band
+        type: string
+        label: Surprise
+        description: >
+          How far above usual the burst was, in bands of standard deviations. The
+          detector flags from 4σ; in October 2026, 30% of flags were 4-6σ, 50%
+          6-10σ, 18% 10-20σ and 2% more.
+        sql: "CASE WHEN surprise < 6 THEN '4-6σ' WHEN surprise < 10 THEN '6-10σ' WHEN surprise < 20 THEN '10-20σ' ELSE '20σ+' END"
+      - name: size_band
+        type: string
+        label: Edits in 30 min
+        description: >
+          The burst's edits in its 30 minutes. "6 (minimum)" is the least the
+          detector flags, and over half of flags; a repeat flag of an article
+          first flagged at 6 typically comes at 9.
+        sql: >-
+          CASE WHEN {{ minimum_size_burst() }} THEN '6 (minimum)' WHEN edits_30m < 10 THEN '7-9'
+          WHEN edits_30m < 20 THEN '10-19' ELSE '20+' END
+      - name: mostly_by
+        type: string
+        label: Mostly by
+        description: >
+          Who made most of the burst's edits: bots or anonymous editors when they
+          made over half, registered editors when bots and anonymous editors
+          together made under half, mixed otherwise.
+        sql: >-
+          CASE WHEN bot_share > 0.5 THEN 'bots' WHEN anonymous_share > 0.5 THEN 'anonymous'
+          WHEN bot_share + anonymous_share < 0.5 THEN 'registered' ELSE 'mixed' END
+      - name: hour_of_day
+        type: number
+        label: Hour (UTC)
+        description: The hour of the day the burst was flagged, 0 to 23 UTC.
+        sql: "hour(event_ts)"
+    metrics:
+      - name: burst_flags
+        description: Number of times the detector flagged a burst, repeat flags of a growing article included.
+        agg: count
+        label: Flags
+      - name: median_surprise
+        description: >
+          The median flag's surprise, in standard deviations above usual.
+          Approximate on Trino and Pinot, and can't be combined across tiers (see
+          coverage). Because so many flags sit at the 6-edit minimum, it moves with
+          the baselines more than with what's happening.
+        agg: percentile
+        percentile: 0.5
+        sql: surprise
+        label: Median surprise
+        unit: σ
+      - name: p90_surprise
+        description: The surprise only the most unusual tenth of flags exceed. Approximate like median_surprise.
+        agg: percentile
+        percentile: 0.9
+        sql: surprise
+        label: 90th percentile surprise
+        unit: σ
+      - name: median_lift
+        description: >
+          The median flag's edits as a multiple of what's usual in 30 minutes for
+          an article being edited (edits_30m / expected_edits): easier to read than
+          σ. Approximate like median_surprise.
+        agg: percentile
+        percentile: 0.5
+        sql: edits_30m / expected_edits
+        filters: ["expected_edits > 0"]
+        label: Edits vs usual
+        unit: ×
+      - name: flag_edits
+        description: Edits in the 30 minutes before each flag, summed over flags; with flag_editors, the parts of edits_per_editor.
+        agg: sum
+        sql: edits_30m
+        label: Edits at flags
+        format: integer
+      - name: flag_editors
+        description: Different editors in the 30 minutes before each flag, summed over flags.
+        agg: sum
+        sql: editors_30m
+        label: Editors at flags
+        format: integer
+      - name: edits_per_editor
+        description: >
+          Edits per editor across flags: how concentrated the editing is. Low, many
+          editors each edit once or twice; high, a few make most of the edits. In
+          October 2026 routine bursts were the most concentrated (2.5, one editor
+          or project working through), edit wars the least (1.9: a vandal and the
+          editors reverting them).
+        type: ratio
+        numerator: flag_edits
+        denominator: flag_editors
+        label: Edits per editor
+      - name: avg_flag_edits
+        description: Average edits in a flag's 30 minutes.
+        agg: avg
+        sql: edits_30m
+        label: Average edits
+      - name: minimum_size_flags
+        description: Flags at the detector's minimum of 6 edits in 30 minutes.
+        agg: count
+        filters: ["{{ minimum_size_burst() }}"]
+        label: At the minimum size
+      - name: minimum_size_share
+        description: >
+          Share of flags at the detector's 6-edit minimum. Over half in October
+          2026: for those, the minimum decided the flag, not the 4σ threshold, so
+          tuning the threshold alone changes little.
+        type: ratio
+        numerator: minimum_size_flags
+        denominator: burst_flags
+        label: Minimum-size share
+        format: percent
+      - name: revert_heavy_flags
+        description: Flags where at least 30% of the 30 minutes' edits undo others.
+        agg: count
+        filters: ["{{ revert_heavy() }}"]
+        label: Revert-heavy
+      - name: revert_heavy_share
+        description: Share of flags where at least 30% of the edits undo others; an edit-war signal, a lower bound outside English.
+        type: ratio
+        numerator: revert_heavy_flags
+        denominator: burst_flags
+        label: Revert-heavy share
+        format: percent

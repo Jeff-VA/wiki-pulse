@@ -24,6 +24,12 @@
 {# An edit saved without a summary of what it changed (the feed sends an empty one). #}
 {% macro no_summary() %}(edit_summary IS NULL OR edit_summary = ''){% endmacro %}
 
+{# A burst flagged at the detector's minimum size: 6 edits in 30 minutes (MIN_EDITS in wiki_pulse/trends.py). Where an article is rarely edited, 6 edits clear 4σ on their own, so the minimum, not the threshold, decides these. #}
+{% macro minimum_size_burst() %}edits_30m <= 6{% endmacro %}
+
+{# A burst in which at least 30% of the 30 minutes' edits undo others: a dispute, or vandalism being cleaned up. About a quarter of bursts. #}
+{% macro revert_heavy() %}revert_share >= 0.3{% endmacro %}
+
 {# Claude's label for a burst (news, edit war, routine or unclear), or 'not read' when Claude didn't read it. #}
 {% macro claude_reading() %}coalesce(claude_label, 'not read'){% endmacro %}
 
