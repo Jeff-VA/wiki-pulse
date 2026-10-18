@@ -240,7 +240,6 @@ services:
     <<: *app
     command: [drift, --serve]
     depends_on: *after-setup
-    mem_limit: 1g  # it profiles a day's edits in pyarrow, edit summaries included; 512 MB ran out
 
   api:
     <<: *app
