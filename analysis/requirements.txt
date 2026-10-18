@@ -1,0 +1,7 @@
+# The classifier study (classifier_study.py): offline only, not part of the stack image.
+numpy>=2.0
+pandas>=2.2
+scikit-learn>=1.5
+xgboost>=2.1
+trino>=0.330
+pyarrow>=17

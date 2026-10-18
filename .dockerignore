@@ -5,3 +5,6 @@
 __pycache__
 proposals
 **/*.duckdb*
+# The offline classifier study and its venv, and session notes: not part of the app
+analysis
+notes

@@ -6,3 +6,4 @@ __pycache__/
 proposals/
 .DS_Store
 *.duckdb*
+analysis/out/

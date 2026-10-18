@@ -1,0 +1,801 @@
+<title>Wiki Pulse Classifier Study</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Code+Pro:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~66ch) for the argument; figures widen to 920px. Findings first, evidence after,
+   decisions last. Wikipedia's own conventions carry the subject: serif section heads over a hairline, link blue,
+   and byte changes printed the way a page history prints them (+593 in green, −313 in red, bold from 500). */
+:root {
+  --paper: #fcfcfb;
+  --raised: #f3f4f6;
+  --ink: #15171b;
+  --ink-2: #4b505a;
+  --muted: #7d828c;
+  --rule: #e1e0d9;
+  --axis: #c3c2b7;
+  --accent: #3366cc;
+  --add: #006400;
+  --remove: #8b0000;
+  --s0: #9a9ea6;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --band: rgba(42, 120, 214, 0.10);
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Source Code Pro", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a1a19; --raised: #232422; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #8f8d86; --rule: #2c2c2a;
+    --axis: #45453f; --accent: #7aa2f7; --add: #4cbf4c; --remove: #ff7b72; --s0: #6f716d; --s1: #3987e5;
+    --s2: #d95926; --s3: #199e70; --band: rgba(57, 135, 229, 0.16); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1a1a19; --raised: #232422; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #8f8d86; --rule: #2c2c2a;
+  --axis: #45453f; --accent: #7aa2f7; --add: #4cbf4c; --remove: #ff7b72; --s0: #6f716d; --s1: #3987e5;
+  --s2: #d95926; --s3: #199e70; --band: rgba(57, 135, 229, 0.16); color-scheme: dark;
+}
+body { background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--sans); }
+main { max-width: 920px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.prose { max-width: 66ch; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.55rem; font-weight: 500; padding-bottom: 6px; border-bottom: 1px solid var(--rule); margin-top: 56px; }
+h3 { font-size: 1.15rem; margin-top: 32px; }
+p { margin: 14px 0 0; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.eyebrow { font: 600 0.78rem/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+header { display: grid; gap: 14px; }
+.lede { font-size: 1.15rem; color: var(--ink-2); max-width: 62ch; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--muted); font-size: 0.9rem; }
+.meta b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.verdict { margin-top: 32px; padding: 20px 22px; background: var(--raised); border-radius: 6px; }
+.verdict h2 { margin: 0; border: 0; padding: 0; font-size: 1.2rem; }
+.verdict ol { margin: 12px 0 0; padding-left: 1.3em; display: grid; gap: 10px; }
+.verdict li::marker { font-family: var(--serif); font-weight: 600; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.add, .remove { font-family: var(--mono); font-size: 0.9em; }
+.add { color: var(--add); } .remove { color: var(--remove); } .big { font-weight: 600; }
+figure { margin: 24px 0 0; }
+figcaption { font-size: 0.92rem; color: var(--ink-2); max-width: 70ch; margin-top: 8px; }
+figcaption b { color: var(--ink); }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.88rem; color: var(--ink-2); margin-bottom: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+.legend i.dot { width: 9px; height: 9px; border-radius: 50%; }
+svg text { font-family: var(--sans); fill: var(--muted); font-size: 12px; }
+svg text.label { fill: var(--ink-2); font-size: 13px; }
+svg text.value { fill: var(--ink); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+svg .grid { stroke: var(--rule); stroke-width: 1; }
+svg .axis { stroke: var(--axis); stroke-width: 1; }
+svg .ref { stroke: var(--muted); stroke-width: 1; }
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); max-width: 260px; }
+.tip .t { color: var(--muted); font-size: 0.78rem; margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 8px; }
+.tip .row i { width: 12px; height: 2px; flex: none; }
+.tip .row b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tip .row span { color: var(--ink-2); }
+.table-wrap { overflow-x: auto; margin-top: 18px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; white-space: normal; }
+th { font-weight: 600; color: var(--ink-2); font-size: 0.82rem; letter-spacing: 0.02em; vertical-align: bottom; }
+tr.pick td { font-weight: 600; }
+tr.pick td:first-child::after { content: "recommended"; margin-left: 8px; font: 600 0.68rem/1 var(--sans); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 3px; padding: 2px 5px; vertical-align: 2px; }
+details { margin-top: 10px; font-size: 0.9rem; }
+summary { cursor: pointer; color: var(--accent); width: fit-content; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 28px; }
+.two > * { min-width: 0; }
+.decisions { display: grid; gap: 16px; margin-top: 18px; }
+.decision { display: grid; grid-template-columns: 2.2rem 1fr; gap: 4px 14px; }
+.decision .n { font: 600 1.35rem/1.2 var(--serif); color: var(--muted); }
+.decision h3 { margin: 0; font-size: 1.08rem; }
+.decision p { margin: 4px 0 0; grid-column: 2; color: var(--ink-2); }
+.pill { display: inline-block; font: 600 0.7rem/1 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 7px;
+  border-radius: 3px; border: 1px solid currentColor; vertical-align: 2px; margin-left: 6px; }
+.pill.done { color: var(--add); } .pill.ask { color: var(--accent); }
+pre { background: var(--raised); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+footer { margin-top: 56px; color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--rule); padding-top: 14px; }
+@media (max-width: 560px) { body { font-size: 16px; } h2 { margin-top: 44px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">wiki-pulse · the ML phase · study 1</div>
+  <h1>Logistic regression or XGBoost, and on which features?</h1>
+  <p class="lede">The news classifier scores every burst the detector flags, so the dashboard can tell a story breaking
+    from an edit war without asking Claude about each one. This study tests which model and which features do that
+    best. Every score is out-of-sample, and no story ever lands on both sides of a train/test split.</p>
+  <div class="meta">
+    <span><b data-v="data.bursts" data-f="int"></b> bursts flagged</span>
+    <span><b data-v="data.labeled" data-f="int"></b> labeled news, edit war or routine</span>
+    <span><b data-v="data.news" data-f="int"></b> news, on <b data-v="data.news_articles" data-f="int"></b> articles</span>
+    <span id="window"></span>
+  </div>
+</header>
+
+<section class="verdict" aria-labelledby="verdict-h">
+  <h2 id="verdict-h">The short answer</h2>
+  <ol>
+    <li><b>Logistic regression, not XGBoost, for now.</b> LR on the v2 features scores
+      <span data-v="m.lr_v2.metrics.ap" data-f="d2"></span> average precision against tuned XGBoost's
+      <span data-v="m.xgb_v2.metrics.ap" data-f="d2"></span>. Given the choice, tuning picked depth-1 trees for
+      XGBoost, an additive model with no interactions, which is nearly what logistic regression already is.</li>
+    <li><b>Features are the real gain.</b> Choosing features honestly inside each training fold lifts average
+      precision from <span data-v="m.lr_deployed.metrics.ap" data-f="d2"></span> (the deployed features) to
+      <span data-v="m.lr_selected.metrics.ap" data-f="d2"></span>, ahead in
+      <span data-v="p.lr_selected__lr_deployed.a_better_share" data-f="pct0"></span> of resamples. Two features carry
+      it: whether the wiki is large, and how busy its baseline is.</li>
+    <li><b>The threshold is the bug users see.</b> The live model's probabilities never reach 0.5, so it never calls
+      news. Calling news at <span data-v="t.p50.threshold" data-f="d2"></span> gives 50% precision and catches
+      <span data-v="t.p50.recall" data-f="pct0"></span> of news.</li>
+    <li><b>The intervals are wide</b> (<span data-v="m.lr_v2.ap_bootstrap_interval.0" data-f="d2"></span> to
+      <span data-v="m.lr_v2.ap_bootstrap_interval.1" data-f="d2"></span> for the best model), because the news labels
+      cover only <span data-v="data.news_articles" data-f="int"></span> stories. The random-sample labels that started
+      today are what will narrow them.</li>
+  </ol>
+</section>
+
+<section class="prose">
+  <h2>What the model learns from</h2>
+  <p>Each row is a burst: an article with at least 6 edits by 3 editors in 30 minutes, at least 4σ above what's usual
+    for an article on that wiki at that hour. Claude Haiku labels a sample of them as <i>news</i>, <i>edit war</i>,
+    <i>routine</i> or <i>unclear</i>. The model predicts news (1) against edit war or routine (0), leaving out the
+    unclear ones. News is <b data-v="base_rate" data-f="pct0"></b> of the labeled bursts.</p>
+  <p>Three facts about these labels shape every choice below.</p>
+  <ul>
+    <li><b>Few positives.</b> <span data-v="data.news" data-f="int"></span> news labels come from only
+      <span data-v="data.news_articles" data-f="int"></span> articles, because a growing story is flagged several
+      times. The real sample size is closer to the number of stories than the number of rows, so every comparison
+      here splits by article and reports an interval.</li>
+    <li><b>A skewed sample.</b> Until today Claude read the first 10 bursts of each hour, so busy hours were the least
+      covered (chart below). The model learned from, and was judged on, a sample tilted toward quiet hours.</li>
+    <li><b>A teacher who sees more.</b> Claude reads the title, the edit summaries and what it knows of the world. The
+      model sees a handful of numbers. Features that carry some of what Claude sees (a year in the title, how busy the
+      article already was) are where the gains should come from.</li>
+  </ul>
+</section>
+<figure>
+  <div class="chart" id="coverage"></div>
+  <figcaption><b>Share of bursts Claude labeled, by hour of the flag (UTC), October 14 onward.</b> First-come reading
+    left the busiest hours, 10:00 to 13:00 UTC, the least covered. <span class="pill done">Fixed today</span> Claude now
+    reads a random half of fresh bursts, and each burst records its chance of being read
+    (<code>read_probability</code>). Filter <code>classifier_eval</code> on <code>label_sample = 'random'</code> for
+    unbiased rates.</figcaption>
+</figure>
+
+<section class="prose">
+  <h2>Why logistic regression, and why Newton's method</h2>
+  <p><b>Newton's method is how the model is fitted, not a modeling choice.</b> Logistic regression with an L2 penalty
+    minimizes one smooth, convex loss, so it has exactly one best set of weights, and any decent solver finds it.
+    Newton's method uses the loss's curvature (a 7×7 matrix here) to reach it in a few steps. scikit-learn's default
+    solver approximates that curvature instead. Fitted on the same data with the same penalty, the deployed Newton
+    code and scikit-learn agree to within <b data-v="newton_check.max_difference" data-f="sci"></b> on every weight, a
+    gap left by scikit-learn stopping at its default tolerance. Writing it in numpy kept scikit-learn out of the
+    stack's image.</p>
+  <p><b>Logistic regression against XGBoost is the real question.</b> XGBoost is usually the strongest choice for
+    tabular data: it adds up hundreds of small trees, each correcting the last, and finds interactions nobody wrote
+    down. That strength needs data. With about 30 news labels in a training fold, a tree can carve out one story per
+    branch, and its probabilities tend to be overconfident on so few positives. A logistic regression has one weight
+    per feature, can't memorize a story, and its log-loss fit keeps probabilities near the base rate unless the
+    evidence is strong. It also deploys as a dozen numbers in an Iceberg table that the detector applies with
+    arithmetic, and each weight reads as an effect in the paper. Those are reasons to expect LR to hold up here, not
+    proof, so the rest of this page measures it, tuning both models the same way.</p>
+</section>
+
+<section class="prose">
+  <h2>Eight models, scored the same way</h2>
+  <p>Three feature sets and two model families:</p>
+  <ul>
+    <li><b>Deployed:</b> the six features the live model uses.</li>
+    <li><b>All <span class="nall"></span>:</b> those six plus candidates from the burst's window, the article's
+      recent past, the wiki's baseline and its size (listed under <a href="#features">Which features carry it</a>).</li>
+    <li><b>v2:</b> the deployed six plus <i>large wiki</i> and <i>year in title</i>, the two candidates that each
+      raised average precision when added alone, with <i>surprise</i> swapped for the <i>usual edits</i> it is
+      measured against. Surprise moves with the edit count (correlation 0.93), so the two weights blow up in opposite
+      directions; edits and the baseline are nearly uncorrelated (0.04), score the same, and give weights that read
+      as effects.</li>
+  </ul>
+  <p>v2 was picked by looking at these same labels, so its score flatters it. The honest check is <b>LR, features
+    picked in each fold</b>: it reruns the picking (forward selection from the deployed six) inside every training
+    fold, so the held-out fold never influences which features are used. XGBoost has its hyperparameters tuned over a
+    24-point grid inside every training fold, and logistic regression has its regularization tuned the same way.
+    XGBoost with the library's defaults shows what an untuned XGBoost does on data this small.</p>
+  <p><b>The headline metric is average precision</b> (the area under the precision–recall curve), because the job is
+    ranking: the dashboard should put real stories at the top. Random guessing scores the base rate,
+    <span data-v="base_rate" data-f="pct0"></span>.</p>
+</section>
+<figure>
+  <div class="chart" id="models"></div>
+  <figcaption><b>Average precision under grouped cross-validation, with 90% intervals from resampling articles.</b>
+    Every tuned model on v2 or all features clears the deployed features, and every logistic regression clears its
+    XGBoost counterpart. Untuned XGBoost (depth 6, 100 trees) falls back to the deployed model's level, with the worst
+    log loss of all: overconfident probabilities. The live row in the calibration chart below is production's own record,
+    <span data-v="live.ap" data-f="d2"></span> average precision on the <span data-v="live.n" data-f="int"></span>
+    bursts it scored before they were labeled.</figcaption>
+</figure>
+<div class="table-wrap"><table id="models-table"></table></div>
+<p class="prose" style="font-size:0.92rem;color:var(--ink-2)">Settled hyperparameters, the ones chosen in the most
+  folds: XGBoost <span id="xgb-settled"></span>; logistic regression <span id="lr-settled"></span>.</p>
+
+<h3>Head to head</h3>
+<p class="prose">Each row compares two models on the same resampled articles. "First ahead" is the share of resamples,
+  and of cross-validation repeats, in which the first model scored higher.</p>
+<div class="table-wrap"><table id="pairs-table"></table></div>
+<p class="prose">Read the intervals before the averages. Three gaps clear zero: features picked in each fold over the
+  deployed features, LR over XGBoost on the deployed features, and tuned over untuned XGBoost. v2 over the deployed
+  features very nearly does. LR against XGBoost on v2 is
+  <span data-v="p.lr_v2__xgb_v2.delta_ap" data-f="signed"></span>, with an interval spanning zero: LR is ahead in
+  <span data-v="p.lr_v2__xgb_v2.a_better_share" data-f="pct0"></span> of resamples, which is a lean, not a verdict.
+  With equal accuracy, logistic regression wins on everything else: weights that read as effects, a model that is a
+  few rows in an Iceberg table, and probabilities that stay calibrated.</p>
+
+<section class="prose">
+  <h2>Precision and recall</h2>
+  <p>Each curve traces what the model catches (recall) against how often it's right (precision) as its threshold
+    falls. Hover to read every model at one recall.</p>
+</section>
+<figure>
+  <div class="chart" id="pr"></div>
+  <figcaption><b>Precision–recall curves from out-of-fold probabilities</b>, averaged over the cross-validation
+    repeats. v2 logistic regression keeps 75% precision out to 30% recall and 57% at 40%; the deployed features are down to
+    37% by 30% recall.</figcaption>
+</figure>
+
+<section class="prose">
+  <h2>Would XGBoost win with more labels?</h2>
+  <p>A fair worry is that XGBoost only needs more data. The learning curve trains each model on a quarter, half,
+    three quarters and all of each training fold's articles, then tests on the same held-out folds.</p>
+</section>
+<figure>
+  <div class="chart" id="learning"></div>
+  <figcaption><b>Average precision against the news labels available for training</b>, with 90% bands across
+    repeats. Both v2 models rise steeply to about 22 news labels and then flatten. XGBoost starts level
+    with LR, slightly ahead at 8 labels, and falls behind as labels grow, the opposite of the "it just needs more data"
+    story at this scale. With every feature, XGBoost gets no better past 16 labels: more columns give the trees more
+    ways to fit noise. More labels of the same kind will narrow the intervals, but the next real gain more likely comes from new
+    information, such as the text Claude reads.</figcaption>
+</figure>
+
+<section class="prose" id="features">
+  <h2>Which features carry it</h2>
+  <p>Medians by Claude's label (shares and yes/no features as averages). Bytes removed are printed the way a
+    Wikipedia page history prints them. A feature can separate the labels well here and still add nothing to the
+    model, when another feature already carries the same information.</p>
+</section>
+<div class="table-wrap"><table id="feat-table"></table></div>
+<div>
+  <figure>
+    <div class="chart" id="ablation-without"></div>
+    <figcaption><b>Leaving a group out of v2</b>: the change in average precision, with 90% intervals across repeats.
+      Blue bars are groups v2 needs.</figcaption>
+  </figure>
+  <figure>
+    <div class="chart" id="ablation-with"></div>
+    <figcaption><b>Adding one more candidate to v2</b>: the same measure. Blue would be a gain; gray adds nothing or
+      costs precision.</figcaption>
+  </figure>
+</div>
+<div class="two">
+  <figure>
+    <div class="chart" id="selection"></div>
+    <figcaption><b>How often each candidate was picked</b> when forward selection ran inside each of the
+      <span data-v="selection.folds" data-f="int"></span> training folds. Stable picks are real signal; rare picks are
+      noise one fold happened to like.</figcaption>
+  </figure>
+  <figure>
+    <div class="chart" id="coefs"></div>
+    <figcaption><b>v2 logistic regression's weights</b>, per standard deviation of each feature, with 90% intervals
+      from refitting on resampled articles. Blue raises the odds of news; orange lowers them.</figcaption>
+  </figure>
+</div>
+<figure>
+  <div class="chart" id="shap"></div>
+  <figcaption><b>What tuned XGBoost leans on when given all 14 features</b>: each feature's average absolute
+    contribution to the log-odds (TreeSHAP, from XGBoost's own <code>pred_contribs</code>).</figcaption>
+</figure>
+<section class="prose">
+  <p><b>What holds up.</b> Wiki size and the baseline are the stable signals: forward selection picked large wiki
+    in <span data-v="selection.picked.large_wiki" data-f="pct0"></span> of training folds and usual edits in
+    <span data-v="selection.picked.log_expected" data-f="pct0"></span>, and leaving either out of v2 costs about 0.07 to
+    0.12. Reverts matter as much, pushing the other way. Tuned XGBoost, given all the features, leans on the baseline
+    most too.</p>
+  <p><b>What doesn't.</b> Year in title looked strong alone (half of news titles carry a year) but adds little once
+    wiki size is in: picked in <span data-v="selection.picked.year_in_title" data-f="pct0"></span> of folds. Bot and
+    anonymous shares slightly hurt v2; dropping them is a candidate once the random-sample labels can confirm it. The
+    20-language revert pattern measures reverts more correctly but predicts no better than the English one here.</p>
+  <p><b>A caution for the paper.</b> Large wiki is the strongest feature, and
+    <span data-v="data.by_tier.large.news" data-f="int"></span> of <span data-v="data.news" data-f="int"></span> news
+    labels are on large wikis. Part of that is real (big wikis cover breaking news fast), and part may be Claude
+    recognizing English and French events more readily than others. The model would then learn Claude's coverage, not
+    the world's. Per-tier precision on the random sample will show which.</p>
+</section>
+
+<section class="prose">
+  <h2>Are the probabilities honest?</h2>
+  <p>A calibrated model's 20% means news about one time in five. Points on the diagonal are calibrated; below it, the
+    model is overconfident.</p>
+</section>
+<figure>
+  <div class="chart" id="calib"></div>
+  <figcaption><b>Calibration by probability band</b>: average predicted probability against the share Claude labeled
+    news. "Live model" is what production actually scored, before each label existed. v2 logistic regression follows the diagonal except in one thin band. The live model sits above it: when it says 8%, news is 15%; when
+    it says 24%, news is 36%. It is underconfident, which is why it never reaches 0.5.</figcaption>
+</figure>
+
+<section class="prose">
+  <h2>Where to draw the line</h2>
+  <p>The live model calls news at 0.5, which it never reaches. A threshold should come from the precision the
+    dashboard needs. These are chosen on v2 logistic regression's out-of-fold probabilities, and "news calls a day"
+    applies each to every burst flagged so far, read or not.</p>
+</section>
+<div class="table-wrap"><table id="thr-table"></table></div>
+<p class="prose">50% precision means half the bursts called news are news, which suits a feed people scan. A threshold
+  chosen on <span data-v="data.labeled" data-f="int"></span> labels moves as labels arrive, so the step should recompute it every time it retrains and store it
+  next to the weights.</p>
+
+<section class="prose">
+  <h2>Robustness checks</h2>
+  <h3>Forward in time</h3>
+  <p>Cross-validation mixes days. Here every model trains on bursts before <span id="split"></span> and is tested on
+    the <span data-v="forward.test" data-f="int"></span> labeled bursts after it
+    (<span data-v="forward.test_news" data-f="int"></span> news). The live row is production's own scores on those
+    bursts.</p>
+</section>
+<div class="table-wrap"><table id="fwd-table"></table></div>
+<section class="prose">
+  <p>Forward in time, the three new models score 0.55 to 0.57, against 0.34 for the deployed features and 0.37 for the
+    live model. XGBoost on every feature edges ahead here, though it trailed in cross-validation; with
+    <span data-v="forward.train_news" data-f="int"></span> news to train on and
+    <span data-v="forward.test_news" data-f="int"></span> to test on, the differences among the three aren't real. v2's
+    features were chosen with these test labels in view, so this check is not fully independent.</p>
+  <h3>The skewed label sample</h3>
+  <p>Weighting each first-come label by how thinly its hour was covered (weights
+    <span data-v="reweighted.weight_range.0" data-f="d1"></span> to
+    <span data-v="reweighted.weight_range.1" data-f="d1"></span>) moves v2's average precision from
+    <b data-v="reweighted.unweighted.ap" data-f="d3"></b> to <b data-v="reweighted.weighted.ap" data-f="d3"></b>.
+    The model does somewhat worse in the busy hours the first-come sample under-covered, so the cross-validated scores
+    above are a little flattering. The random sample removes this bias for every label from today on.</p>
+  <h3>The October 16–17 incident window</h3>
+  <p>Duplicated edits inflated the baselines for 38 hours, so surprise was understated there. v2 doesn't use surprise.
+    Training with the window's <span data-v="incident.labeled_inside" data-f="int"></span> labels
+    (<span data-v="incident.news_inside" data-f="int"></span> news) scores
+    <b data-v="incident.ap_trained_with" data-f="d3"></b> on bursts outside it, against
+    <b data-v="incident.ap_trained_without" data-f="d3"></b> without them. Keep the window: its labels help more than the distorted baseline hurts.</p>
+</section>
+
+<section>
+  <h2>Decisions</h2>
+  <div class="decisions">
+    <div class="decision"><div class="n">1</div><h3>Keep logistic regression <span class="pill ask">Recommended</span></h3>
+      <p>Tuned XGBoost scores <span data-v="m.xgb_v2.metrics.ap" data-f="d2"></span> on v2 and
+        <span data-v="m.xgb_all.metrics.ap" data-f="d2"></span> on every feature, against logistic regression's
+        <span data-v="m.lr_v2.metrics.ap" data-f="d2"></span>, and tuning chose C =
+        <span data-v="settled.lr_c" data-f="d1"></span>, the deployed value. Revisit XGBoost by rerunning this study as
+        random-sample labels accumulate, and switch when its learning curve crosses LR's.</p></div>
+    <div class="decision"><div class="n">2</div><h3>Ship the v2 features <span class="pill ask">Recommended</span></h3>
+      <p>Large wiki and usual edits in place of surprise carry the gain; year in title is cheap and marginal. None
+        needs a new data feed: the size tier is
+        the <code>wikis</code> lookup the stack already maintains, the year is a regex on the title, and usual edits
+        is already on every burst row. <code>classifier.py</code>'s feature list and the detector change together,
+        so training and serving compute the same features.</p></div>
+    <div class="decision"><div class="n">3</div><h3>Learn the threshold with the weights <span class="pill ask">Recommended</span></h3>
+      <p>Call news at the probability that keeps precision at 50% or more: <span data-v="t.p50.threshold" data-f="d2"></span>
+        here, catching <span data-v="t.p50.recall" data-f="pct0"></span> of news, about
+        <span data-v="t.p50.news_calls_per_day" data-f="d1"></span> calls a day. The step stores it in
+        <code>gold.news_classifier</code>, the detector records each burst's call, and the <code>called_news()</code>
+        macro reads that call in place of a hard-coded 0.5.</p></div>
+    <div class="decision"><div class="n">4</div><h3>Gate the model on what matters <span class="pill ask">Recommended</span></h3>
+      <p>The current gate (training accuracy above always answering "not news") passes almost any model: the live one
+        cleared it by 0.6 points. Gate instead on grouped out-of-fold average precision beating the base rate by a
+        clear margin, computed in the step with the same numpy fit.</p></div>
+    <div class="decision"><div class="n">5</div><h3>How many bursts Claude reads <span class="pill ask">Your call</span></h3>
+      <p>Claude now reads a random half of fresh bursts, about the old spend. Reading all of them costs about $0.26 a
+        day and doubles the labels, which is what this model is short of. Keeping a fraction unread costs labels and
+        buys nothing for the evaluation, because the random half is already unbiased.</p></div>
+    <div class="decision"><div class="n">6</div><h3>Label sampling <span class="pill done">Done today</span></h3>
+      <p>Random reads with a logged probability, <code>read_probability</code> on every burst, and the
+        <code>label_sample</code> dimension in <code>classifier_eval</code>. From here on, the random sample is the
+        clean test set for every decision above.</p></div>
+  </div>
+</section>
+
+<footer>
+  <p>Reproduce: <code>cd analysis &amp;&amp; python features.py &amp;&amp; python classifier_study.py &amp;&amp; python report.py</code>
+    (with the stack running; <code>features.py</code> reads the lakehouse through Trino). Settings:
+    <span data-v="repeats" data-f="int"></span> repeats of 5-fold cross-validation grouped by article, hyperparameters
+    tuned in 4 inner folds of each training fold, <span data-v="bootstrap" data-f="int"></span> bootstrap resamples of
+    articles for intervals. Generated <span id="generated"></span>.</p>
+</footer>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script type="application/json" id="results">__RESULTS__</script>
+<script>
+"use strict";
+const R = JSON.parse(document.getElementById("results").textContent);
+const M = Object.fromEntries(R.models.map(m => [m.key, m]));
+const P = Object.fromEntries(R.pairs.map(p => [p.a + "__" + p.b, p]));
+const T = Object.fromEntries(R.thresholds.map(t => [t.rule.startsWith("best") ? "f1" : "p" + t.rule.match(/\d+/)[0], t]));
+const A = Object.fromEntries(R.ablation.map(a => [a.change.replace(/\W+/g, "_"), a]));
+const NALL = Object.keys(R.features).length;
+const NAME = {
+  lr_deployed: "LR, deployed features", lr_v2: "LR, v2 features", lr_selected: "LR, features picked in each fold",
+  lr_all: `LR, all ${NALL} features`, xgb_deployed: "XGBoost, deployed features", xgb_v2: "XGBoost, v2 features",
+  xgb_all: `XGBoost, all ${NALL} features`, xgb_all_defaults: `XGBoost, all ${NALL}, library defaults`, live: "Live model, as scored",
+};
+document.querySelectorAll(".nall").forEach(n => { n.textContent = NALL; });
+// One color per model across every chart; models that appear only in the dot plot stay neutral
+const COLOR = { lr_v2: "var(--s1)", xgb_v2: "var(--s2)", xgb_all: "var(--s3)", lr_deployed: "var(--s0)", live: "var(--s0)" };
+const colorOf = k => COLOR[k] || "var(--muted)";
+const FMT = {
+  pct0: v => (v * 100).toFixed(0) + "%", pct1: v => (v * 100).toFixed(1) + "%", d1: v => v.toFixed(1),
+  d2: v => v.toFixed(2), d3: v => v.toFixed(3), int: v => Math.round(v).toLocaleString("en-US"),
+  sci: v => v.toExponential(0).replace("e-", " × 10⁻").replace(/(\d+)$/, d => [...d].map(c => "⁰¹²³⁴⁵⁶⁷⁸⁹"[c]).join("")),
+  signed: v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(3),
+};
+const ctx = { ...R, m: M, p: P, t: T, a: A };
+const get = path => path.split(".").reduce((o, k) => (o == null ? o : o[k]), ctx);
+document.querySelectorAll("[data-v]").forEach(el => {
+  const v = get(el.dataset.v);
+  el.textContent = v == null ? "–" : FMT[el.dataset.f || "d2"](v);
+  el.classList.add("num");
+});
+
+// Tooltip: one element, filled with textContent only
+const tip = document.getElementById("tip");
+function showTip(evt, title, rows) {
+  tip.replaceChildren();
+  if (title) { const t = document.createElement("div"); t.className = "t"; t.textContent = title; tip.append(t); }
+  for (const [color, value, label] of rows) {
+    const r = document.createElement("div"); r.className = "row";
+    if (color) { const i = document.createElement("i"); i.style.background = color; r.append(i); }
+    const b = document.createElement("b"); b.textContent = value; r.append(b);
+    if (label) { const s = document.createElement("span"); s.textContent = label; r.append(s); }
+    tip.append(r);
+  }
+  tip.hidden = false;
+  const x = evt.clientX ?? evt.target.getBoundingClientRect().right, y = evt.clientY ?? evt.target.getBoundingClientRect().top;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(window.innerWidth - w - 8, x + 14) + "px";
+  tip.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, y - h / 2)) + "px";
+}
+const hideTip = () => { tip.hidden = true; };
+
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  if (parent) parent.append(e);
+  return e;
+}
+const lin = (d0, d1, r0, r1) => v => r0 + ((v - d0) / (d1 - d0)) * (r1 - r0);
+function niceTicks(lo, hi, n = 5) {
+  const step = Math.pow(10, Math.floor(Math.log10((hi - lo) / n)));
+  const err = (hi - lo) / n / step;
+  const s = step * (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1);
+  const out = [];
+  for (let v = Math.ceil(lo / s) * s; v <= hi + 1e-9; v += s) out.push(+v.toFixed(10));
+  return out;
+}
+function legend(host, items) {
+  const box = document.createElement("div"); box.className = "legend";
+  for (const [label, color, kind] of items) {
+    const s = document.createElement("span"); const i = document.createElement("i");
+    if (kind === "dot") i.className = "dot";
+    i.style.background = color; s.append(i, document.createTextNode(label)); box.append(s);
+  }
+  host.prepend(box);
+}
+function frame(host, height) {
+  const width = Math.max(300, host.clientWidth);
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img" });
+  host.append(svg);
+  return { svg, width, height };
+}
+const charts = [];
+function chart(id, draw) {
+  const host = document.getElementById(id);
+  const render = () => { host.querySelectorAll("svg, .legend").forEach(n => n.remove()); draw(host); };
+  charts.push(render);
+  render();
+}
+let lastWidth = window.innerWidth;
+new ResizeObserver(() => { if (Math.abs(window.innerWidth - lastWidth) > 30) { lastWidth = window.innerWidth; charts.forEach(r => r()); } }).observe(document.body);
+
+// A dot with an interval per row, e.g. average precision with its 90% bootstrap interval
+function dotInterval(host, rows, { domain, ref, refLabel, fmt = FMT.d2, title }) {
+  const narrow = host.clientWidth < 560;
+  const rowH = 34, top = 14, bottom = 30;
+  const { svg, width } = frame(host, top + rows.length * rowH + bottom);
+  const left = narrow ? 128 : 210, right = 54;
+  const x = lin(domain[0], domain[1], left, width - right);
+  const ticks = niceTicks(domain[0], domain[1], narrow ? 4 : 6);
+  for (const t of ticks) {
+    el("line", { x1: x(t), x2: x(t), y1: top - 6, y2: top + rows.length * rowH, class: "grid" }, svg);
+    el("text", { x: x(t), y: top + rows.length * rowH + 18, "text-anchor": "middle" }, svg, fmt(t));
+  }
+  if (ref != null) {
+    el("line", { x1: x(ref), x2: x(ref), y1: top - 6, y2: top + rows.length * rowH, class: "ref" }, svg);
+    if (refLabel) el("text", { x: x(ref) + 4, y: top + 2 }, svg, refLabel);
+  }
+  rows.forEach((r, i) => {
+    const y = top + i * rowH + rowH / 2 + 4;
+    const label = el("text", { x: left - 12, y: y + 4, "text-anchor": "end", class: "label" }, svg, r.label);
+    if (narrow) label.setAttribute("font-size", "11.5");
+    if (r.lo != null) el("line", { x1: x(r.lo), x2: x(r.hi), y1: y, y2: y, stroke: r.color, "stroke-width": 2, "stroke-linecap": "round", opacity: 0.55 }, svg);
+    el("circle", { cx: x(r.value), cy: y, r: 5, fill: r.color, stroke: "var(--paper)", "stroke-width": 2 }, svg);
+    el("text", { x: Math.min(width - 4, Math.max(x(r.hi ?? r.value), x(r.value)) + 10), y: y + 4, class: "value" }, svg, fmt(r.value));
+    const hit = el("rect", { x: 0, y: y - rowH / 2, width, height: rowH, fill: "transparent", tabindex: 0 }, svg);
+    const tipRows = [[r.color, fmt(r.value), title || ""]];
+    if (r.lo != null) tipRows.push([null, `${fmt(r.lo)} to ${fmt(r.hi)}`, "90% interval"]);
+    for (const extra of r.extra || []) tipRows.push([null, extra[0], extra[1]]);
+    hit.addEventListener("pointermove", e => showTip(e, r.label, tipRows));
+    hit.addEventListener("focus", e => showTip(e, r.label, tipRows));
+    hit.addEventListener("pointerleave", hideTip); hit.addEventListener("blur", hideTip);
+  });
+}
+
+// Lines over a shared x, with a crosshair that reads every series at the pointer
+function lines(host, series, { xDomain, yDomain, xLabel, yLabel, xFmt = FMT.d1, yFmt = FMT.d2, height = 300, diagonal = false, points = false, step = false }) {
+  legend(host, series.map(s => [s.label, s.color, points ? "dot" : "line"]));
+  const narrow = host.clientWidth < 560;
+  const { svg, width } = frame(host, height);
+  const m = { l: narrow ? 42 : 52, r: 14, t: 10, b: 44 };
+  const x = lin(xDomain[0], xDomain[1], m.l, width - m.r), y = lin(yDomain[0], yDomain[1], height - m.b, m.t);
+  for (const t of niceTicks(yDomain[0], yDomain[1], 5)) {
+    el("line", { x1: m.l, x2: width - m.r, y1: y(t), y2: y(t), class: "grid" }, svg);
+    el("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, svg, yFmt(t));
+  }
+  for (const t of niceTicks(xDomain[0], xDomain[1], narrow ? 4 : 6)) el("text", { x: x(t), y: height - m.b + 18, "text-anchor": "middle" }, svg, xFmt(t));
+  el("line", { x1: m.l, x2: width - m.r, y1: height - m.b, y2: height - m.b, class: "axis" }, svg);
+  el("text", { x: (m.l + width - m.r) / 2, y: height - 6, "text-anchor": "middle" }, svg, xLabel);
+  el("text", { x: 12, y: (m.t + height - m.b) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(m.t + height - m.b) / 2})` }, svg, yLabel);
+  if (diagonal) el("line", { x1: x(xDomain[0]), y1: y(yDomain[0]), x2: x(Math.min(xDomain[1], yDomain[1])), y2: y(Math.min(xDomain[1], yDomain[1])), class: "ref" }, svg);
+  for (const s of series) {
+    if (s.band) {
+      const pts = s.band.map(([bx, lo]) => `${x(bx)},${y(lo)}`).concat([...s.band].reverse().map(([bx, , hi]) => `${x(bx)},${y(hi)}`));
+      el("polygon", { points: pts.join(" "), fill: s.color, opacity: 0.12 }, svg);
+    }
+    let d = "";
+    s.points.forEach(([px, py], i) => {
+      if (i === 0) d += `M${x(px)},${y(py)}`;
+      else d += step ? `H${x(px)}V${y(py)}` : `L${x(px)},${y(py)}`;
+    });
+    el("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    if (points) for (const [px, py] of s.points) el("circle", { cx: x(px), cy: y(py), r: 4, fill: s.color, stroke: "var(--paper)", "stroke-width": 2 }, svg);
+  }
+  const cross = el("line", { y1: m.t, y2: height - m.b, class: "ref", opacity: 0 }, svg);
+  const hit = el("rect", { x: m.l, y: m.t, width: width - m.l - m.r, height: height - m.t - m.b, fill: "transparent" }, svg);
+  const xs = [...new Set(series.flatMap(s => s.points.map(p => p[0])))].sort((a, b) => a - b);
+  hit.addEventListener("pointermove", e => {
+    const box = svg.getBoundingClientRect();
+    const px = ((e.clientX - box.left) / box.width) * width;
+    const xv = xDomain[0] + ((px - m.l) / (width - m.l - m.r)) * (xDomain[1] - xDomain[0]);
+    const snap = xs.reduce((a, b) => (Math.abs(b - xv) < Math.abs(a - xv) ? b : a), xs[0]);
+    cross.setAttribute("x1", x(snap)); cross.setAttribute("x2", x(snap)); cross.setAttribute("opacity", 1);
+    const rows = series.map(s => {
+      const near = s.points.reduce((a, b) => (Math.abs(b[0] - snap) < Math.abs(a[0] - snap) ? b : a));
+      return [s.color, yFmt(near[1]), s.label + (near[2] ? ` (${near[2]})` : "")];
+    });
+    showTip(e, `${xLabel}: ${xFmt(snap)}`, rows);
+  });
+  hit.addEventListener("pointerleave", () => { hideTip(); cross.setAttribute("opacity", 0); });
+}
+
+// Horizontal bars from zero, for importances and changes; negative values extend left
+function bars(host, rows, { domain, fmt = FMT.d3, title, color = "var(--s1)" }) {
+  const narrow = host.clientWidth < 560;
+  const rowH = 30, top = 8, bottom = 28;
+  const { svg, width } = frame(host, top + rows.length * rowH + bottom);
+  const left = narrow ? 132 : 230, right = 60;
+  const x = lin(domain[0], domain[1], left, width - right);
+  for (const t of niceTicks(domain[0], domain[1], narrow ? 4 : 6)) {
+    el("line", { x1: x(t), x2: x(t), y1: top, y2: top + rows.length * rowH, class: "grid" }, svg);
+    el("text", { x: x(t), y: top + rows.length * rowH + 18, "text-anchor": "middle" }, svg, fmt(t));
+  }
+  el("line", { x1: x(0), x2: x(0), y1: top, y2: top + rows.length * rowH, class: "axis" }, svg);
+  rows.forEach((r, i) => {
+    const yc = top + i * rowH + rowH / 2;
+    const label = el("text", { x: left - 12, y: yc + 4, "text-anchor": "end", class: "label" }, svg, r.label);
+    if (narrow) label.setAttribute("font-size", "11.5");
+    const x0 = x(Math.min(0, r.value)), x1 = x(Math.max(0, r.value)), h = Math.min(16, rowH - 10);
+    const w = Math.max(1, x1 - x0), rad = Math.min(4, w / 2);
+    const neg = r.value < 0;
+    const d = neg
+      ? `M${x1},${yc - h / 2} H${x0 + rad} Q${x0},${yc - h / 2} ${x0},${yc - h / 2 + rad} V${yc + h / 2 - rad} Q${x0},${yc + h / 2} ${x0 + rad},${yc + h / 2} H${x1} Z`
+      : `M${x0},${yc - h / 2} H${x1 - rad} Q${x1},${yc - h / 2} ${x1},${yc - h / 2 + rad} V${yc + h / 2 - rad} Q${x1},${yc + h / 2} ${x1 - rad},${yc + h / 2} H${x0} Z`;
+    el("path", { d, fill: r.color || color }, svg);
+    if (r.lo != null) el("line", { x1: x(r.lo), x2: x(r.hi), y1: yc, y2: yc, stroke: "var(--ink-2)", "stroke-width": 1.5, opacity: 0.7 }, svg);
+    const tx = neg ? x(0) + 6 : Math.max(x1, r.hi != null ? x(r.hi) : x1) + 6;  // negatives: right of zero, clear of labels
+    el("text", { x: tx, y: yc + 4, "text-anchor": "start", class: "value" }, svg, fmt(r.value));
+    const hit = el("rect", { x: 0, y: yc - rowH / 2, width, height: rowH, fill: "transparent", tabindex: 0 }, svg);
+    const tipRows = [[r.color || color, fmt(r.value), title || ""]];
+    if (r.lo != null) tipRows.push([null, `${fmt(r.lo)} to ${fmt(r.hi)}`, "90% interval"]);
+    if (r.note) tipRows.push([null, r.note, ""]);
+    hit.addEventListener("pointermove", e => showTip(e, r.label, tipRows));
+    hit.addEventListener("focus", e => showTip(e, r.label, tipRows));
+    hit.addEventListener("pointerleave", hideTip); hit.addEventListener("blur", hideTip);
+  });
+}
+
+// Columns, one per category, e.g. label coverage by hour of day
+function columns(host, rows, { domain, fmt = FMT.pct0, title, height = 210 }) {
+  const { svg, width } = frame(host, height);
+  const m = { l: 40, r: 8, t: 10, b: 34 };
+  const y = lin(domain[0], domain[1], height - m.b, m.t);
+  const band = (width - m.l - m.r) / rows.length, bw = Math.min(24, band - 2);
+  for (const t of niceTicks(domain[0], domain[1], 4)) {
+    el("line", { x1: m.l, x2: width - m.r, y1: y(t), y2: y(t), class: "grid" }, svg);
+    el("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, svg, fmt(t));
+  }
+  rows.forEach((r, i) => {
+    const cx = m.l + band * i + band / 2, top = y(r.value), base = y(0), rad = Math.min(4, bw / 2);
+    el("path", { d: `M${cx - bw / 2},${base} V${top + rad} Q${cx - bw / 2},${top} ${cx - bw / 2 + rad},${top} H${cx + bw / 2 - rad} Q${cx + bw / 2},${top} ${cx + bw / 2},${top + rad} V${base} Z`, fill: r.color || "var(--s1)" }, svg);
+    if (i % (width < 560 ? 3 : 2) === 0) el("text", { x: cx, y: height - m.b + 16, "text-anchor": "middle" }, svg, r.label);
+    const hit = el("rect", { x: cx - band / 2, y: m.t, width: band, height: height - m.t - m.b, fill: "transparent", tabindex: 0 }, svg);
+    const tipRows = [[r.color || "var(--s1)", fmt(r.value), title], ...(r.extra || [])];
+    hit.addEventListener("pointermove", e => showTip(e, r.tipTitle || r.label, tipRows));
+    hit.addEventListener("focus", e => showTip(e, r.tipTitle || r.label, tipRows));
+    hit.addEventListener("pointerleave", hideTip); hit.addEventListener("blur", hideTip);
+  });
+  el("line", { x1: m.l, x2: width - m.r, y1: y(0), y2: y(0), class: "axis" }, svg);
+  el("text", { x: (m.l + width - m.r) / 2, y: height - 4, "text-anchor": "middle" }, svg, "Hour of the day (UTC)");
+}
+
+// Tables built from the data, so the numbers behind every chart are readable without hovering
+function table(id, head, rows, pick) {
+  const t = document.getElementById(id);
+  const tr = document.createElement("tr");
+  for (const h of head) { const th = document.createElement("th"); th.textContent = h; tr.append(th); }
+  t.append(tr);
+  for (const r of rows) {
+    const row = document.createElement("tr");
+    if (pick && pick(r)) row.className = "pick";
+    for (const c of r.cells) { const td = document.createElement("td"); td.textContent = c; row.append(td); }
+    t.append(row);
+  }
+}
+const day = s => new Date(s.replace(" ", "T") + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+document.getElementById("window").textContent = `${day(R.data.first)} to ${day(R.data.last)} 2026`;
+document.getElementById("split").textContent = new Date(R.forward.split.replace(" ", "T") + "Z").toLocaleString("en-US",
+  { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC";
+document.getElementById("generated").textContent = new Date(R.generated_at).toUTCString().replace(":00 GMT", " UTC");
+
+chart("coverage", host => columns(host, R.data.coverage_by_hour.map(h => ({
+  label: String(h.hour).padStart(2, "0"), value: h.labeled / h.flagged, tipTitle: `${String(h.hour).padStart(2, "0")}:00 UTC`,
+  extra: [[null, `${h.labeled} of ${h.flagged}`, "bursts labeled"]],
+})), { domain: [0, 0.6], title: "labeled" }));
+const ORDER = ["lr_deployed", "lr_v2", "lr_selected", "lr_all", "xgb_deployed", "xgb_v2", "xgb_all", "xgb_all_defaults"];
+const PICK = "lr_v2";
+const apMax = Math.ceil(Math.max(...R.models.map(m => m.ap_bootstrap_interval[1])) * 10) / 10;
+chart("models", host => dotInterval(host, ORDER.map(k => ({
+  label: NAME[k], value: M[k].metrics.ap, lo: M[k].ap_bootstrap_interval[0], hi: M[k].ap_bootstrap_interval[1], color: colorOf(k),
+  extra: [[null, FMT.d2(M[k].metrics.roc_auc), "ROC-AUC"], [null, FMT.pct0(M[k].metrics.precision_top10), "precision in the top 10%"]],
+})), { domain: [0, apMax], ref: R.base_rate, refLabel: `random guessing ${FMT.pct0(R.base_rate)}`, fmt: FMT.d2, title: "average precision" }));
+
+table("models-table", ["Model", "Average precision", "90% interval", "ROC-AUC", "Log loss", "Brier", "Precision, top 10%"],
+  ORDER.map(k => ({ key: k, cells: [NAME[k], FMT.d3(M[k].metrics.ap), `${FMT.d2(M[k].ap_bootstrap_interval[0])} to ${FMT.d2(M[k].ap_bootstrap_interval[1])}`,
+    FMT.d3(M[k].metrics.roc_auc), FMT.d3(M[k].metrics.log_loss), FMT.d3(M[k].metrics.brier), FMT.pct0(M[k].metrics.precision_top10)] })),
+  r => r.key === PICK);
+
+table("pairs-table", ["Comparison", "Difference in average precision", "90% interval", "First ahead, bootstrap", "First ahead, CV repeats"],
+  R.pairs.map(p => ({ cells: [`${NAME[p.a]} vs ${NAME[p.b]}`, FMT.signed(p.delta_ap), `${FMT.signed(p.interval[0])} to ${FMT.signed(p.interval[1])}`,
+    FMT.pct0(p.a_better_share), FMT.pct0(p.a_better_repeats)] })));
+
+const settled = R.settled.xgb;
+const describe = x => `depth ${x.max_depth}, ${x.n_estimators} trees, learning rate ${x.learning_rate}, minimum child weight ${x.min_child_weight}`;
+document.getElementById("xgb-settled").textContent = `${describe(settled)} on v2; ${describe(R.settled.xgb_all)} on all 14`;
+document.getElementById("lr-settled").textContent = `C = ${R.settled.lr_c}`;
+
+chart("pr", host => lines(host, ["lr_deployed", "lr_v2", "xgb_v2", "xgb_all"].map(k => ({
+  label: NAME[k], color: COLOR[k], points: R.pr_curves[k],
+})), { xDomain: [0, 1], yDomain: [0, 1], xLabel: "Recall: share of news caught", yLabel: "Precision", xFmt: FMT.pct0, yFmt: FMT.pct0, step: true, height: 320 }));
+
+chart("learning", host => {
+  const keys = ["lr_v2", "xgb_v2", "xgb_all"];
+  const xs = keys.flatMap(k => R.learning_curve[k].map(p => p.news_in_training));
+  lines(host, keys.map(k => ({
+    label: NAME[k], color: COLOR[k],
+    points: R.learning_curve[k].map(p => [p.news_in_training, p.ap, `${FMT.pct0(p.fraction)} of training articles`]),
+    band: R.learning_curve[k].map(p => [p.news_in_training, p.ap_interval[0], p.ap_interval[1]]),
+  })), { xDomain: [Math.floor(Math.min(...xs) / 5) * 5, Math.ceil(Math.max(...xs) / 5) * 5], yDomain: [0, apMax],
+    xLabel: "News labels in the training folds", yLabel: "Average precision", xFmt: FMT.int, yFmt: FMT.d2, points: true, height: 300 });
+});
+
+const SHORT = {
+  log_edits: "Edits", log_editors: "Editors", log_surprise: "Surprise (σ)", log_expected: "Usual edits (baseline)",
+  bot_share: "Bot share", anonymous_share: "Anonymous share",
+  revert_share: "Revert share, English", revert_share_any_language: "Revert share, 20 languages", year_in_title: "Year in title",
+  log_prior_24h: "Edits in the prior 24 h", log_earlier_flags: "Earlier flags, 24 h", log_bytes_removed: "Bytes removed",
+  new_page: "Created in the window", span_minutes: "Minutes, first to last edit", large_wiki: "Large wiki",
+};
+const ab = R.ablation.filter(a => a.kind !== "v2");
+const abMax = Math.max(...ab.map(a => Math.max(Math.abs(a.delta_interval[0]), Math.abs(a.delta_interval[1])))) * 1.1;
+for (const kind of ["without", "with"]) {
+  chart("ablation-" + kind, host => bars(host, ab.filter(a => a.kind === kind).map(a => ({
+    label: (kind === "without" ? "− " : "+ ") + a.features.map(f => SHORT[f]).join(", "),
+    value: a.delta, lo: a.delta_interval[0], hi: a.delta_interval[1],
+    color: (kind === "without" ? a.delta < 0 : a.delta > 0) ? "var(--s1)" : "var(--s0)",
+    note: `ahead of v2 in ${FMT.pct0(a.ahead_share)} of repeats`,
+  })).sort((p, q) => p.value - q.value), { domain: [-abMax, abMax], fmt: FMT.signed, title: "change in average precision" }));
+}
+chart("selection", host => bars(host, Object.entries(R.selection.picked).sort((p, q) => q[1] - p[1]).map(([f, share]) => ({
+  label: SHORT[f], value: share, color: share >= 0.5 ? "var(--s1)" : "var(--s0)",
+  note: `picked in ${Math.round(share * R.selection.folds)} of ${R.selection.folds} training folds`,
+})), { domain: [0, 1], fmt: FMT.pct0, title: "of training folds picked it" }));
+
+const cMax = Math.max(...R.coefficients.map(c => Math.max(Math.abs(c.interval[0]), Math.abs(c.interval[1])))) * 1.05;
+chart("coefs", host => dotInterval(host, [...R.coefficients].sort((p, q) => q.weight - p.weight).map(c => ({
+  label: SHORT[c.feature], value: c.weight, lo: c.interval[0], hi: c.interval[1], color: c.weight >= 0 ? "var(--s1)" : "var(--s2)",
+  extra: [[null, FMT.d2(Math.exp(c.weight)) + "×", "odds per standard deviation"]],
+})), { domain: [-cMax, cMax], ref: 0, fmt: FMT.d2, title: "weight per standard deviation" }));
+
+const shapMax = Math.max(...R.shap.map(s => s.mean_abs)) * 1.1;
+chart("shap", host => bars(host, [...R.shap].sort((p, q) => q.mean_abs - p.mean_abs).map(s => ({ label: SHORT[s.feature], value: s.mean_abs, color: "var(--s2)" })),
+  { domain: [0, shapMax], fmt: FMT.d2, title: "mean |contribution| to log-odds" }));
+
+chart("calib", host => {
+  const keys = ["lr_v2", "xgb_v2", "xgb_all", "live"];
+  const all = keys.flatMap(k => R.calibration[k]);
+  const top = Math.min(1, Math.ceil(Math.max(...all.map(b => Math.max(b.predicted, b.observed))) * 10) / 10);
+  lines(host, keys.map(k => ({
+    label: NAME[k], color: COLOR[k], points: R.calibration[k].map(b => [b.predicted, b.observed, `${b.band}, ${b.n} bursts`]),
+  })), { xDomain: [0, top], yDomain: [0, top], xLabel: "Predicted probability of news (band average)", yLabel: "Share Claude labeled news",
+    xFmt: FMT.pct0, yFmt: FMT.pct0, diagonal: true, points: true, height: 320 });
+});
+
+table("thr-table", ["Rule", "Threshold", "Precision", "Recall", "News calls a day"],
+  R.thresholds.map(t => ({ rule: t.rule, cells: [t.rule, FMT.d3(t.threshold), FMT.pct0(t.precision), FMT.pct0(t.recall), FMT.d1(t.news_calls_per_day)] })),
+  r => r.rule === "precision of 50% or more, most recall");
+
+const F = R.forward;
+table("fwd-table", ["Model", "Average precision", "ROC-AUC", "Brier", "Precision, top 10%"],
+  ["lr_deployed", "lr_v2", "xgb_v2", "xgb_all", "live"].map(k => ({ key: k, cells: [NAME[k], FMT.d3(F.models[k].ap), FMT.d3(F.models[k].roc_auc),
+    FMT.d3(F.models[k].brier), FMT.pct0(F.models[k].precision_top10)] })), r => r.key === PICK);
+
+// Feature medians by label, printed the way Wikipedia prints a page history's byte changes
+const fe = document.getElementById("feat-table");
+const LABELS = ["news", "edit war", "routine"];
+const head = document.createElement("tr");
+for (const h of ["Feature", "News", "Edit war", "Routine", "In"]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+fe.append(head);
+const BINARY = new Set(["year_in_title", "new_page", "large_wiki"]);
+for (const [name, f] of Object.entries(R.features)) {
+  const tr = document.createElement("tr");
+  const td0 = document.createElement("td"); td0.textContent = SHORT[name]; td0.title = f.description; tr.append(td0);
+  for (const label of LABELS) {
+    const td = document.createElement("td");
+    let v = BINARY.has(name) ? f.mean[label] : f.median[label];
+    if (name === "log_expected") v = Math.exp(v);
+    else if (name.startsWith("log_")) v = Math.expm1(v);
+    if (name === "log_bytes_removed") {
+      const s = document.createElement("span"); s.className = "remove" + (v >= 500 ? " big" : ""); s.textContent = "−" + Math.round(v).toLocaleString("en-US");
+      td.append(s);
+    } else if (BINARY.has(name) || name.includes("share")) td.textContent = FMT.pct0(v);
+    else if (name === "log_expected") td.textContent = FMT.d2(v);
+    else if (name === "span_minutes") td.textContent = FMT.d1(v) + " min";
+    else if (name === "log_surprise") td.textContent = FMT.d1(v) + "σ";
+    else td.textContent = FMT.d1(v);
+    tr.append(td);
+  }
+  const td = document.createElement("td");
+  td.textContent = [f.in_deployed ? "deployed" : "", f.in_v2 ? "v2" : ""].filter(Boolean).join(", ") || "tested";
+  tr.append(td);
+  fe.append(tr);
+}
+/*CHARTS*/
+</script>
