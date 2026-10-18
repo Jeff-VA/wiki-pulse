@@ -17,12 +17,16 @@ START = datetime(2026, 10, 12, 9, 0)
 # What's usual on enwiki at 9:00: 1.5 edits an hour (std 2), so 0.75 in 30 minutes (std 1.41).
 # A burst then needs 7 edits: (7 - 0.75) / 1.41 = 4.4 standard deviations.
 BASELINES = pa.table({"wiki": ["enwiki"], "hour_of_day": [9], "mean_edits": [1.5], "std_edits": [2.0]})
+FEATURES = ["(intercept)", "log_edits", "log_editors", "log_expected", "bot_share", "anonymous_share", "revert_share",
+            "large_wiki", "year_in_title"]  # fmt: skip
 MODEL = pa.table({
-    "feature": ["(intercept)", "log_edits", "log_editors", "log_surprise", "bot_share", "anonymous_share", "revert_share"],
-    "weight": [0.5, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
-    "center": [0.0] * 7,
-    "scale": [1.0] * 7,
+    "feature": FEATURES,
+    "weight": [0.5, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0],
+    "center": [0.0] * 9,
+    "scale": [1.0] * 9,
+    "threshold": [0.5] * 9,  # the probability at which the model calls news
 })
+SIZES = pa.table({"wiki": ["enwiki"], "size_tier": ["large"]})
 
 
 class Claude:
@@ -40,7 +44,7 @@ class Claude:
 
 
 def detector(tables=None, explainer=None, now=START + timedelta(minutes=7), chance=0.0, read_probability=READ_PROBABILITY):  # a minute after the test burst
-    tables = {"gold.trend_baselines": BASELINES, "gold.news_classifier": MODEL} if tables is None else tables
+    tables = {"gold.trend_baselines": BASELINES, "gold.news_classifier": MODEL, "gold.wiki_sizes": SIZES} if tables is None else tables
     platform = load_platform(CONFIG)
     messages = []
 
@@ -82,6 +86,7 @@ def test_a_burst_is_flagged_once_with_its_numbers():
     assert (burst["edits_30m"], burst["editors_30m"], burst["expected_edits"]) == (7, 4, 0.75)
     assert burst["surprise"] == pytest.approx(4.42, abs=0.01)
     assert burst["p_news"] == pytest.approx(0.892, abs=0.001)  # the model: sigmoid(0.5 + 1.0 * log(1 + 4 editors))
+    assert burst["called_news"] is True  # 0.892 clears the model's threshold of 0.5
     assert (burst["claude_label"], burst["explanation"], burst["read_probability"]) == (None, None, None)  # no Claude here
     assert conform(load_platform(CONFIG).dataset("trends"), burst) is None  # fits the trends dataset
 
@@ -111,8 +116,27 @@ def test_without_baselines_or_a_model_it_uses_defaults():
     trends, messages = detector(tables={})
     assert trends.usual("enwiki", 9) == DEFAULT
     [burst] = trends.process(busy(8))  # the default is lower: a burst at the 6th edit, the minimum
-    assert burst["expected_edits"] == DEFAULT[0] and burst["p_news"] is None
+    assert burst["expected_edits"] == DEFAULT[0] and burst["p_news"] is None and burst["called_news"] is None
     assert messages[0].startswith("trends: no baselines yet, using defaults")
+
+
+def test_the_classifier_sees_the_wikis_size_and_the_title():
+    by_size = pa.table(MODEL.to_pydict() | {"weight": [-3.0, 0, 0, 0, 0, 0, 0, 3.0, 0]})  # news only on a large wiki
+    by_title = pa.table(MODEL.to_pydict() | {"weight": [-3.0, 0, 0, 0, 0, 0, 0, 0, 3.0]})  # news only with a year
+    for model, title, expected in [(by_size, "Taylor Swift", True), (by_title, "Taylor Swift", False), (by_title, "2026 World Series", True)]:
+        trends, _ = detector(tables={"gold.trend_baselines": BASELINES, "gold.news_classifier": model, "gold.wiki_sizes": SIZES})
+        [burst] = trends.process(busy(10, title=title))
+        assert burst["called_news"] is expected, (title, burst["p_news"])
+    trends, _ = detector(tables={"gold.trend_baselines": BASELINES, "gold.news_classifier": by_size})  # no size tiers yet
+    assert trends.process(busy(10))[0]["called_news"] is False  # a wiki without a tier scores as not large
+
+
+def test_weights_without_a_threshold_score_nothing():
+    """The weights of a classifier from before thresholds were learned (until the step retrains)."""
+    old = MODEL.drop_columns(["threshold"])
+    trends, _ = detector(tables={"gold.trend_baselines": BASELINES, "gold.news_classifier": old, "gold.wiki_sizes": SIZES})
+    [burst] = trends.process(busy(10))
+    assert burst["p_news"] is None and burst["called_news"] is None
 
 
 def test_claude_reads_fresh_bursts_with_their_summaries():

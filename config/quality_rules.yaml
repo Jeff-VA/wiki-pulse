@@ -68,8 +68,12 @@ rules:
     checks:
       - {type: not_null, columns: [feature, weight, center, scale]}
       - type: expression
-        description: the classifier beats always guessing the more common label
-        sql: "training_accuracy > greatest(news_share, 1 - news_share)"
+        description: >-
+          the classifier ranks news well above chance: on bursts from articles it
+          didn't train on, its average precision closes at least a fifth of the
+          gap between random guessing (which scores the share of news) and perfect
+        sql: "cv_average_precision >= news_share + 0.2 * (1 - news_share)"
+      - {type: range, column: threshold, min: 0, max: 1}
       - type: range  # huge weights mean the fit ran away; the detector keeps the last good model
         column: weight
         min: -15

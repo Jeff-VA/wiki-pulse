@@ -4,14 +4,17 @@ A processor over the edits stream (ingestion.yaml: trends). For every article
 it keeps the last 30 minutes of edits. When the count stands far above what's
 usual for an article being edited on that wiki at that hour of the day, it
 emits a burst: the counts, how surprising they are (in standard deviations),
-the news classifier's probability that it's a story breaking, and, for fresh
+the news classifier's probability that it's a story breaking and whether that
+probability clears the threshold its model learned, and, for fresh
 bursts within a budget, Claude's label and one-line explanation. Each burst
 records its chance of being read, so the labels are a sample whose bias is
 known, and the classifier can be judged without it.
 
 What's usual comes from a pipeline step, gold.trend_baselines; the classifier's
-weights from another, gold.news_classifier. The detector reloads both every 15
-minutes, so the models it applies improve as history and labels accumulate.
+weights and threshold from another, gold.news_classifier; each wiki's size tier,
+one of the classifier's features, from gold.wiki_sizes. The detector reloads
+them every 15 minutes, so the models it applies improve as history and labels
+accumulate.
 """
 
 import math
@@ -44,6 +47,8 @@ class TrendDetector:
         self.reported: dict[tuple[str, str], tuple[datetime, float]] = {}
         self.baselines: dict[tuple[str, int], tuple[float, float]] = {}
         self.model: list[dict] | None = None
+        self.threshold: float | None = None  # the probability at which the model calls news
+        self.sizes: dict[str, str] = {}  # each wiki's size tier
         self.loaded: datetime | None = None
         self.swept: datetime | None = None
 
@@ -93,7 +98,8 @@ class TrendDetector:
             "anonymous_share": round(sum(e["is_anonymous"] for e in window) / edits, 3),
             "revert_share": round(sum(e["is_revert"] for e in window) / edits, 3),
         }
-        burst["p_news"] = predict(self.model, burst)
+        burst["p_news"] = predict(self.model, burst | {"size_tier": self.sizes.get(edit["wiki"])})
+        burst["called_news"] = None if burst["p_news"] is None else burst["p_news"] >= self.threshold
         burst["read_probability"], reading = None, None
         if self.explainer:
             # Reading the first bursts of each hour skewed the labels toward quiet hours. A coin flip, with its odds
@@ -119,9 +125,14 @@ class TrendDetector:
         except Exception as e:  # the table doesn't exist until the step first runs
             self.context.log(f"trends: no baselines yet, using defaults ({str(e)[:120]})")
         try:
-            self.model = self.context.query("SELECT feature, weight, center, scale FROM gold.news_classifier").to_pylist() or None
+            rows = self.context.query("SELECT feature, weight, center, scale, threshold FROM gold.news_classifier").to_pylist()
+            self.model, self.threshold = (rows, rows[0]["threshold"]) if rows and rows[0]["threshold"] is not None else (None, None)
         except Exception:
-            self.model = None  # trained once enough bursts have Claude's labels
+            self.model, self.threshold = None, None  # trained once enough bursts have Claude's labels
+        try:
+            self.sizes = {r["wiki"]: r["size_tier"] for r in self.context.query("SELECT wiki, size_tier FROM gold.wiki_sizes").to_pylist()}
+        except Exception:
+            self.sizes = {}  # a wiki without a tier scores as not large
 
     def _sweep(self, now: datetime) -> None:
         self.windows = {k: w for k, w in self.windows.items() if w and w[-1]["event_ts"] > now - WINDOW}

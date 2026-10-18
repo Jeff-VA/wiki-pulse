@@ -10,7 +10,9 @@ columns:
 SELECT CASE feature
          WHEN 'log_edits' THEN 'Edits (log)'
          WHEN 'log_editors' THEN 'Editors (log)'
-         WHEN 'log_surprise' THEN 'Surprise (log)'
+         WHEN 'log_expected' THEN 'Usual edits (log)'
+         WHEN 'large_wiki' THEN 'Large wiki'
+         WHEN 'year_in_title' THEN 'Year in title'
          WHEN 'bot_share' THEN 'Bot share'
          WHEN 'anonymous_share' THEN 'Anonymous share'
          WHEN 'revert_share' THEN 'Revert share'

@@ -71,14 +71,14 @@
     <div class="al-head">
       <div>
         <h2 id="model-title">The news classifier</h2>
-        <p class="al-caption"><al-text view="classifier_status" empty="Not trained yet: it needs 30 bursts Claude has labeled, at least 5 of them news and 5 not.">Trained on {samples} bursts Claude labeled, {news_share} of them news, and right about {training_accuracy} of them. Last trained {trained_at} UTC; it retrains hourly.</al-text></p>
+        <p class="al-caption"><al-text view="classifier_status" empty="Not trained yet: it needs 30 bursts Claude has labeled, at least 5 of them news and 5 not.">Trained on {samples} bursts Claude labeled, {news_share} of them news. It calls news from a probability of {threshold}, which on bursts it hadn't trained on caught {threshold_recall} of news, {threshold_precision} of its calls right. Last trained {trained_at} UTC; it retrains hourly.</al-text></p>
       </div>
     </div>
     <div class="two-col">
       <al-bars view="classifier_weights" category="feature" value="weight" label="What pushes a burst toward news (+) or away (−)"></al-bars>
       <div class="al-card how">
-        <p><strong>Why a classifier, when Claude reads bursts?</strong> Claude reads at most 10 bursts an hour, the freshest. A logistic regression trained on its labels scores every burst, instantly and for free: Claude's judgment, distilled into six numbers.</p>
-        <p><strong>How it learns.</strong> A pipeline step refits it hourly on every burst Claude has labeled, and publishes the weights as a table, behind a quality gate: the model must beat always guessing the more common label. The burst detector reloads the weights every 15 minutes.</p>
+        <p><strong>Why a classifier, when Claude reads bursts?</strong> Claude reads fresh bursts within a daily budget, a few seconds after each and at a cost. A logistic regression trained on its labels scores every burst the moment it's flagged, for free: Claude's judgment, distilled into eight numbers.</p>
+        <p><strong>How it learns.</strong> A pipeline step refits it hourly on every burst Claude has labeled, chooses the probability at which it calls news (the most news caught at 50% precision, on articles it didn't train on), and publishes both as a table, behind a quality gate: its average precision must close at least a fifth of the gap between random guessing and perfect. The burst detector reloads them every 15 minutes.</p>
         <p><strong>How it's checked.</strong> Agreement with Claude, above, counts only bursts scored before Claude labeled them, so it's accuracy on bursts the model hadn't seen.</p>
       </div>
     </div>

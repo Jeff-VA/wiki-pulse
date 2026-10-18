@@ -279,7 +279,7 @@ models:
       - name: classifier_says
         type: string
         label: Classifier's call
-        description: news when the classifier gives a probability of 0.5 or more, otherwise other; untrained until it has enough labels.
+        description: news when the classifier called the burst news (its probability cleared the threshold its model learned; 0.5 before October 18, 2026), otherwise other; untrained until it has enough labels.
         sql: "CASE WHEN p_news IS NULL THEN 'untrained' WHEN {{ called_news() }} THEN 'news' ELSE 'other' END"
     metrics:
       - name: bursts
@@ -340,7 +340,7 @@ models:
         filters: ["{{ judged_by_both() }}"]
         label: Judged by both
       - name: agreed_bursts
-        description: Bursts where the classifier's call (news at a probability of 0.5 or more) matched Claude's label.
+        description: Bursts where the classifier's call (news when its probability cleared its model's threshold) matched Claude's label.
         agg: count
         filters:
           - "{{ judged_by_both() }}"
@@ -383,7 +383,7 @@ models:
       - name: classifier_says
         type: string
         label: Classifier's call
-        description: news when the classifier gives a probability of 0.5 or more, otherwise other; untrained until it has enough labels.
+        description: news when the classifier called the burst news (its probability cleared the threshold its model learned; 0.5 before October 18, 2026), otherwise other; untrained until it has enough labels.
         sql: "CASE WHEN p_news IS NULL THEN 'untrained' WHEN {{ called_news() }} THEN 'news' ELSE 'other' END"
       - name: score_band
         type: string
@@ -445,7 +445,7 @@ models:
         filters: ["{{ judged_by_both() }}"]
         label: Evaluated
       - name: true_positives
-        description: Evaluated bursts the classifier called news (probability 0.5 or more) and Claude labeled news.
+        description: Evaluated bursts the classifier called news (at its model's threshold) and Claude labeled news.
         agg: count
         filters: ["{{ judged_by_both() }}", "{{ called_news() }}", "claude_label = 'news'"]
         label: News caught

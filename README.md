@@ -76,12 +76,17 @@ without it (`label_sample` in `classifier_eval`). Each read logs the tokens it
 used.
 
 **The classifier.** It is an L2-regularized logistic regression, fit by
-Newton's method in numpy. Its features are the log of edits, editors and
-surprise, and the shares of edits by bots, by anonymous editors and undoing
-other edits. Its quality gate requires it to beat always guessing the more
-common label. The dashboard shows its agreement with Claude only on bursts it
-scored *before* Claude labeled them, which makes that an honest
-out-of-sample accuracy.
+Newton's method in numpy. Its features are the log of edits, editors and the
+usual count for the wiki and hour; the shares of edits by bots, by anonymous
+editors and undoing other edits; whether the wiki is large; and whether the
+title holds a year. It calls news from the probability that catches the most
+news at 50% precision, chosen on out-of-fold probabilities from folds that keep
+each article together, and the detector records each call (`called_news`). Its
+quality gate requires that out-of-fold average precision close at least a
+fifth of the gap between random guessing (the share of news) and perfect. Each burst is scored by the model trained before
+it was labeled, so `classifier_eval` is an honest out-of-sample evaluation.
+[`analysis/`](analysis/) holds the study behind these choices: logistic
+regression against XGBoost, under cross-validation grouped by article.
 
 ## Dashboards
 

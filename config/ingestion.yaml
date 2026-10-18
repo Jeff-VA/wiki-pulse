@@ -74,6 +74,7 @@ datasets:
       - {name: anonymous_share, type: double}
       - {name: revert_share, type: double}
       - {name: p_news, type: double}  # the news classifier's probability; null until it's trained
+      - {name: called_news, type: boolean}  # p_news at or above its model's threshold; null when unscored, and before October 18, 2026
       - {name: read_probability, type: double}  # the chance Claude was to read it: 0 if it couldn't; null without Claude, and before October 18, 2026
       - {name: claude_label, type: string}  # news, edit war, routine or unclear; null if Claude didn't read it
       - {name: explanation, type: string}  # Claude's one sentence

@@ -36,8 +36,8 @@
 {# Claude's label for a burst (news, edit war, routine or unclear), or 'not read' when Claude didn't read it. #}
 {% macro claude_reading() %}coalesce(claude_label, 'not read'){% endmacro %}
 
-{# The news classifier calls a burst news: a probability of 0.5 or more. The decision threshold, in one place. #}
-{% macro called_news() %}p_news >= 0.5{% endmacro %}
+{# The news classifier calls a burst news: its probability clears the threshold its model learned (called_news, recorded by the detector from October 18, 2026), or 0.5 for bursts scored before then. The decision, in one place. #}
+{% macro called_news() %}coalesce(called_news, p_news >= 0.5){% endmacro %}
 
 {# A burst the classifier can be judged on: it scored it, and Claude labeled it news, edit war or routine (an unclear or unread burst has no answer to compare with). #}
 {% macro judged_by_both() %}(p_news IS NOT NULL AND claude_label IN ('news', 'edit war', 'routine')){% endmacro %}

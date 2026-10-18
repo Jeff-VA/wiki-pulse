@@ -79,11 +79,14 @@ steps:
     output: gold.news_classifier
     description: >
       A logistic regression that tells a story breaking from an edit war or
-      routine work, from a burst's numbers alone. It's trained on the bursts
-      Claude has labeled, and the burst detector applies it to every burst,
-      including the many Claude never reads. One row per weight.
+      routine work, from a burst's numbers, its title and its wiki's size. It's
+      trained on the bursts Claude has labeled, and the burst detector applies it
+      to every burst. One row per weight, each carrying the threshold at which
+      the model calls news (the most news caught at 50% precision), chosen on
+      out-of-fold probabilities from folds that keep each article together, and
+      the average precision on those probabilities.
     run: wiki_pulse.classifier:fit
-    reads: [raw.trends]
+    reads: [raw.trends, gold.wiki_sizes]
     columns:
       feature: string
       weight: double
@@ -92,6 +95,10 @@ steps:
       samples: int
       news_share: double
       training_accuracy: double
+      threshold: double
+      threshold_precision: double
+      threshold_recall: double
+      cv_average_precision: double
       trained_at: timestamp
     time_column: trained_at
     every_minutes: 60

@@ -89,6 +89,15 @@ def test_score_bands_hold_each_burst_once():
     }  # fmt: skip
 
 
+def test_a_recorded_call_wins_over_the_old_fixed_threshold():
+    """From October 18, 2026 the detector records the call its model's learned threshold made; earlier bursts
+    fall back to 0.5."""
+    calls = [(0.4, True, "news"), (0.6, False, "routine"), (0.6, None, "routine"), (0.3, None, "news")]
+    rows = [burst(i, p, label) | {"called_news": called} for i, (p, called, label) in enumerate(calls)]
+    [row] = query("true_positives", "true_negatives", "false_positives", "false_negatives", rows=rows)
+    assert row == {"true_positives": 1, "true_negatives": 1, "false_positives": 1, "false_negatives": 1}
+
+
 def test_label_sample_tells_the_random_sample_from_the_first_come_one():
     chances = [None, None, 0.5, 0.5, 0.5, 0.0]  # labeled first come; then a coin flip; then the budget spent
     rows = [burst(i, 0.1, "routine") | {"read_probability": chance} for i, chance in enumerate(chances)]
