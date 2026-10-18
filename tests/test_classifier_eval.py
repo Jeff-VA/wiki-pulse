@@ -38,8 +38,8 @@ def burst(minute: int, p_news: float | None, label: str | None) -> dict:
     }  # fmt: skip
 
 
-def query(*metrics: str, dimensions: tuple[str, ...] = ()) -> list[dict]:
-    rows = [burst(minute, p, label) for minute, (p, label) in enumerate(BURSTS)]
+def query(*metrics: str, dimensions: tuple[str, ...] = (), rows: list[dict] | None = None) -> list[dict]:
+    rows = rows or [burst(minute, p, label) for minute, (p, label) in enumerate(BURSTS)]
     con = duckdb.connect()
     con.register("t", pa.Table.from_pylist(rows, schema=arrow_schema(PLATFORM.dataset("trends"))))
     question = MetricQuery(metrics=list(metrics), dimensions=list(dimensions), start=T0, end=T0 + timedelta(hours=1))
@@ -87,6 +87,13 @@ def test_score_bands_hold_each_burst_once():
     assert {r["score_band"]: r["flagged_bursts"] for r in rows} == {
         "0-10%": 1, "10-30%": 2, "30-50%": 2, "50-70%": 1, "70-100%": 1, "unscored": 1,
     }  # fmt: skip
+
+
+def test_label_sample_tells_the_random_sample_from_the_first_come_one():
+    chances = [None, None, 0.5, 0.5, 0.5, 0.0]  # labeled first come; then a coin flip; then the budget spent
+    rows = [burst(i, 0.1, "routine") | {"read_probability": chance} for i, chance in enumerate(chances)]
+    result = query("flagged_bursts", dimensions=("label_sample",), rows=rows)
+    assert {r["label_sample"]: r["flagged_bursts"] for r in result} == {"first come": 2, "random": 3, "not eligible": 1}
 
 
 @pytest.mark.parametrize("engine", ["pinot", "trino"])

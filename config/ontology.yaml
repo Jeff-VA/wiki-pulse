@@ -273,7 +273,7 @@ models:
         description: >
           Claude's label for the burst: news (a real-world event), edit war,
           routine or unclear; "not read" when Claude didn't read it (no API key,
-          or its hourly budget was spent).
+          its budget was spent, or the coin flip that samples bursts passed it over).
         sql: "{{ claude_reading() }}"
       - {name: explanation, type: string, label: What's happening, description: Claude's one sentence about the burst.}
       - name: classifier_says
@@ -364,8 +364,10 @@ models:
       confusion matrix, precision, recall and the Brier score on the bursts both
       judged, and how many bursts Claude labeled at all. The detector scores each
       burst with the model trained before it, so these are out-of-sample. Labeled
-      bursts are few, and Claude reads only the first fresh bursts of each hour,
-      so read every rate alongside its counts and label_coverage.
+      bursts are few, so read every rate alongside its counts and label_coverage.
+      Until October 18, 2026 Claude read the first fresh bursts of each hour, a
+      skewed sample; since then it reads a random one. For unbiased rates, filter
+      on label_sample = 'random'.
     source: trends
     time_dimension: event_ts
     dimensions:
@@ -397,10 +399,20 @@ models:
         type: number
         label: Hour (UTC)
         description: >
-          The hour of the day the burst was flagged, 0 to 23 UTC. Claude reads at
-          most 10 bursts an hour, the first that arrive, so its coverage varies
-          through the day.
+          The hour of the day the burst was flagged, 0 to 23 UTC. Until October
+          18, 2026 Claude read the first 10 bursts of each hour, so its coverage
+          varied through the day: lowest in the busiest hours.
         sql: "hour(event_ts)"
+      - name: label_sample
+        type: string
+        label: Label sample
+        description: >
+          How Claude picked the bursts it read. random: the burst had a recorded
+          chance of being read (from October 18, 2026), so rates over this sample
+          are unbiased for every burst in it. not eligible: it had no chance (not
+          fresh, or Claude's budget was spent). first come: before October 18,
+          when Claude read the first bursts of each hour, skewed toward quiet hours.
+        sql: "{{ label_sample() }}"
     metrics:
       - name: flagged_bursts
         description: Number of bursts flagged, labeled or not.

@@ -30,6 +30,9 @@
 {# A burst in which at least 30% of the 30 minutes' edits undo others: a dispute, or vandalism being cleaned up. About a quarter of bursts. #}
 {% macro revert_heavy() %}revert_share >= 0.3{% endmacro %}
 
+{# How Claude came to read a burst or not. random: it had a recorded chance of being read (read_probability), from October 18, 2026, so the labels in this sample represent every burst in it. not eligible: no chance (not fresh, or Claude's budget was spent). first come: before then, when Claude read the first bursts of each hour, a sample skewed toward quiet hours. #}
+{% macro label_sample() %}CASE WHEN read_probability > 0 THEN 'random' WHEN read_probability = 0 THEN 'not eligible' ELSE 'first come' END{% endmacro %}
+
 {# Claude's label for a burst (news, edit war, routine or unclear), or 'not read' when Claude didn't read it. #}
 {% macro claude_reading() %}coalesce(claude_label, 'not read'){% endmacro %}
 

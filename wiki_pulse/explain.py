@@ -1,10 +1,10 @@
 """Claude's read of a burst: what kind it is, and what's happening, in one sentence.
 
-The burst detector asks about fresh bursts only, within a budget (10 reads an
-hour, 120 a day: about $0.15 a day), using Claude Haiku 4.5: quick and cheap
-for a short, structured answer. Each read logs the tokens it used. The label
-trains the news classifier; the sentence goes on the dashboard. Without
-ANTHROPIC_API_KEY, bursts simply go without either.
+The burst detector asks about a random sample of fresh bursts, within a budget
+(15 reads an hour, 200 a day; a read costs about $0.0009), using Claude Haiku
+4.5: quick and cheap for a short, structured answer. Each read logs the tokens
+it used. The label trains the news classifier; the sentence goes on the
+dashboard. Without ANTHROPIC_API_KEY, bursts simply go without either.
 """
 
 import os
@@ -35,7 +35,7 @@ class Reading(BaseModel):
 
 
 class Explainer:
-    def __init__(self, client: anthropic.Anthropic, *, per_hour: int = 10, per_day: int = 120, log=print, clock=time.monotonic):
+    def __init__(self, client: anthropic.Anthropic, *, per_hour: int = 15, per_day: int = 200, log=print, clock=time.monotonic):
         self.client, self.per_hour, self.per_day, self.log, self.clock = client, per_hour, per_day, log, clock
         self.calls: deque[float] = deque()  # when each read of the last day was made
         self.spent_today = False
@@ -47,8 +47,8 @@ class Explainer:
             return None
         return cls(anthropic.Anthropic(timeout=20, max_retries=1), log=log)
 
-    def read(self, burst: dict, summaries: list[str]) -> Reading | None:
-        """Claude's reading of `burst`, or None if the budget is spent or the call failed."""
+    def has_budget(self) -> bool:
+        """Whether the budget has room for a read now. Asking spends nothing."""
         now = self.clock()
         while self.calls and now - self.calls[0] > 86400:
             self.calls.popleft()
@@ -56,11 +56,15 @@ class Explainer:
             if not self.spent_today:
                 self.log(f"explain: the day's {self.per_day} reads are spent; bursts go unread until the oldest is a day old")
             self.spent_today = True
-            return None
+            return False
         self.spent_today = False
-        if sum(now - t <= 3600 for t in self.calls) >= self.per_hour:
+        return sum(now - t <= 3600 for t in self.calls) < self.per_hour
+
+    def read(self, burst: dict, summaries: list[str]) -> Reading | None:
+        """Claude's reading of `burst`, or None if the budget is spent or the call failed."""
+        if not self.has_budget():
             return None
-        self.calls.append(now)
+        self.calls.append(self.clock())
         try:
             response = self.client.messages.parse(
                 model=MODEL,

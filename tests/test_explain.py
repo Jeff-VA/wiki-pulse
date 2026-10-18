@@ -68,6 +68,14 @@ def test_it_keeps_to_its_hourly_budget():
     assert len(messages.calls) == 3
 
 
+def test_asking_about_the_budget_spends_none_of_it():
+    messages = Messages(reply())
+    reader, _, _ = explainer(messages, per_hour=1)
+    assert reader.has_budget() and reader.has_budget()
+    reader.read(BURST, [])
+    assert not reader.has_budget() and len(messages.calls) == 1
+
+
 def test_it_keeps_to_its_daily_budget():
     messages = Messages(reply())
     reader, clock, logged = explainer(messages, per_hour=2, per_day=3)

@@ -50,8 +50,9 @@ datasets:
       Bursts: an article getting far more edits than usual for its wiki and the
       hour, flagged as it happens by the burst detector. Each burst carries its
       last 30 minutes' counts, how surprising they are, the news classifier's
-      probability that a story is breaking, and, for most, Claude's label and
-      one-line explanation.
+      probability that a story is breaking, and, for a random sample of them,
+      Claude's label and one-line explanation, with each burst's chance of
+      being read.
     topic: wiki-trends
     time_column: event_ts  # the edit that made it a burst
     processor:
@@ -73,6 +74,7 @@ datasets:
       - {name: anonymous_share, type: double}
       - {name: revert_share, type: double}
       - {name: p_news, type: double}  # the news classifier's probability; null until it's trained
+      - {name: read_probability, type: double}  # the chance Claude was to read it: 0 if it couldn't; null without Claude, and before October 18, 2026
       - {name: claude_label, type: string}  # news, edit war, routine or unclear; null if Claude didn't read it
       - {name: explanation, type: string}  # Claude's one sentence
     realtime:

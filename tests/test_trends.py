@@ -10,7 +10,7 @@ from agentic_lakehouse.config import load_platform
 from agentic_lakehouse.processors import ProcessorContext
 from agentic_lakehouse.sources import conform
 from wiki_pulse.explain import Reading
-from wiki_pulse.trends import DEFAULT, TrendDetector
+from wiki_pulse.trends import DEFAULT, READ_PROBABILITY, TrendDetector
 
 CONFIG = Path(__file__).parents[1] / "config"
 START = datetime(2026, 10, 12, 9, 0)
@@ -28,15 +28,18 @@ MODEL = pa.table({
 class Claude:
     """Stands in for wiki_pulse.explain.Explainer, recording what it was asked."""
 
-    def __init__(self):
-        self.asked = []
+    def __init__(self, budget=True):
+        self.asked, self.budget = [], budget
+
+    def has_budget(self):
+        return self.budget
 
     def read(self, burst, summaries):
         self.asked.append((burst["title"], summaries))
         return Reading(category="news", explanation=f"{burst['title']} is in the news.")
 
 
-def detector(tables=None, explainer=None, now=START + timedelta(minutes=7)):  # a minute after the test burst
+def detector(tables=None, explainer=None, now=START + timedelta(minutes=7), chance=0.0):  # a minute after the test burst
     tables = {"gold.trend_baselines": BASELINES, "gold.news_classifier": MODEL} if tables is None else tables
     platform = load_platform(CONFIG)
     messages = []
@@ -48,7 +51,7 @@ def detector(tables=None, explainer=None, now=START + timedelta(minutes=7)):  # 
         return tables[table]
 
     context = ProcessorContext(platform.dataset("trends"), platform.dataset("edits"), query=query, log=messages.append, now=lambda: now)
-    return TrendDetector(context, explainer=explainer, use_claude=False), messages
+    return TrendDetector(context, explainer=explainer, use_claude=False, chance=lambda: chance), messages
 
 
 def edit(minute: float, title="Taylor Swift", editor="Editor1", **fields) -> dict:
@@ -79,7 +82,7 @@ def test_a_burst_is_flagged_once_with_its_numbers():
     assert (burst["edits_30m"], burst["editors_30m"], burst["expected_edits"]) == (7, 4, 0.75)
     assert burst["surprise"] == pytest.approx(4.42, abs=0.01)
     assert burst["p_news"] == pytest.approx(0.892, abs=0.001)  # the model: sigmoid(0.5 + 1.0 * log(1 + 4 editors))
-    assert (burst["claude_label"], burst["explanation"]) == (None, None)  # no Claude here
+    assert (burst["claude_label"], burst["explanation"], burst["read_probability"]) == (None, None, None)  # no Claude here
     assert conform(load_platform(CONFIG).dataset("trends"), burst) is None  # fits the trends dataset
 
 
@@ -126,6 +129,23 @@ def test_claude_doesnt_spend_its_budget_on_old_bursts():
     trends, _ = detector(explainer=claude, now=START + timedelta(hours=3))  # replaying input from 3 hours ago
     [burst] = trends.process(busy(10))
     assert claude.asked == [] and burst["claude_label"] is None
+    assert burst["read_probability"] == 0.0  # it never had a chance of being read
+
+
+@pytest.mark.parametrize("chance, read", [(0.0, True), (READ_PROBABILITY - 0.01, True), (READ_PROBABILITY, False), (0.99, False)])
+def test_claude_reads_a_random_sample_and_each_burst_records_its_odds(chance, read):
+    claude = Claude()
+    trends, _ = detector(explainer=claude, chance=chance)
+    [burst] = trends.process(busy(10))
+    assert bool(claude.asked) == read and (burst["claude_label"] == "news") == read
+    assert burst["read_probability"] == READ_PROBABILITY  # read or not, it had this chance: the labels' sampling weight
+
+
+def test_a_burst_arriving_with_the_budget_spent_had_no_chance_of_being_read():
+    claude = Claude(budget=False)
+    trends, _ = detector(explainer=claude)
+    [burst] = trends.process(busy(10))
+    assert claude.asked == [] and burst["read_probability"] == 0.0
 
 
 def test_quiet_seconds_and_old_articles_are_swept_away():
