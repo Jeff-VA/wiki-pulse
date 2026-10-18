@@ -42,5 +42,8 @@
 {# A burst the classifier can be judged on: it scored it, and Claude labeled it news, edit war or routine (an unclear or unread burst has no answer to compare with). #}
 {% macro judged_by_both() %}(p_news IS NOT NULL AND claude_label IN ('news', 'edit war', 'routine')){% endmacro %}
 
+{# Which rule made the classifier's call on a burst: learned (the threshold its model learned, recorded from October 18, 2026), fixed 0.5 (before then), or unscored (no model yet). #}
+{% macro call_rule() %}CASE WHEN p_news IS NULL THEN 'unscored' WHEN called_news IS NULL THEN 'fixed 0.5' ELSE 'learned' END{% endmacro %}
+
 {# 1 for a burst Claude labeled news, 0 otherwise: the outcome the classifier's probability is scored against. #}
 {% macro news_outcome() %}CASE WHEN claude_label = 'news' THEN 1.0 ELSE 0.0 END{% endmacro %}

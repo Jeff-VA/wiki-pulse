@@ -38,8 +38,13 @@
       <al-kpi view="burst_total" value="bursts" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
       <al-kpi view="burst_total" value="burst_articles" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
       <al-kpi view="burst_total" value="news_share" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
-      <al-kpi view="burst_total" value="agreement" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
+      <al-kpi view="burst_total" value="called_news_bursts" compare="from_minutes_ago=2880&amp;to_minutes_ago=1440"></al-kpi>
     </div>
+  </section>
+
+  <section class="al-section" aria-labelledby="breaking-title">
+    <div class="al-head"><h2 id="breaking-title">Breaking now</h2><span class="al-caption">bursts the classifier calls news, most confident first, last 24 hours</span></div>
+    <al-table view="bursts_breaking" columns="flagged_at,url,language,news_probability,peak_editors,reading,explanation"></al-table>
   </section>
 
   <section class="al-section" aria-labelledby="latest-title">
@@ -67,19 +72,44 @@
     <al-lines view="bursts_hourly" x="hour" y="$count" height="220"></al-lines>
   </section>
 
+  <section class="al-section" aria-labelledby="size-title">
+    <div class="al-head">
+      <div>
+        <h2 id="size-title">Bursts by wiki size</h2>
+        <p class="al-caption">Last 7 days. Large wikis burst most for their edits. Revert-heavy bursts look rare outside the large wikis partly because the revert pattern reads English edit summaries only.</p>
+      </div>
+    </div>
+    <div class="two-col">
+      <al-bars view="bursts_by_size" category="size_tier" value="bursts_per_10k_edits" label="Bursts per 10,000 edits"></al-bars>
+      <al-table view="bursts_by_size" columns="size_tier,burst_flags,median_lift,minimum_size_share,revert_heavy_share"></al-table>
+    </div>
+  </section>
+
   <section class="al-section" aria-labelledby="model-title">
     <div class="al-head">
       <div>
         <h2 id="model-title">The news classifier</h2>
         <p class="al-caption"><al-text view="classifier_status" empty="Not trained yet: it needs 30 bursts Claude has labeled, at least 5 of them news and 5 not.">Trained on {samples} bursts Claude labeled, {news_share} of them news. It calls news from a probability of {threshold}, which on bursts it hadn't trained on caught {threshold_recall} of news, {threshold_precision} of its calls right. Last trained {trained_at} UTC; it retrains hourly.</al-text></p>
       </div>
+      <al-param name="call_rule" options="learned=Learned threshold (v2),fixed 0.5=Fixed 0.5 (before)" label="Calls made with"></al-param>
+    </div>
+    <div class="al-grid">
+      <al-kpi view="classifier_quality" value="news_precision"></al-kpi>
+      <al-kpi view="classifier_quality" value="news_recall"></al-kpi>
+      <al-kpi view="classifier_quality" value="evaluated_news"></al-kpi>
+      <al-kpi view="classifier_quality" value="brier_score"></al-kpi>
+    </div>
+    <p class="al-caption">Last 7 days, against Claude's labels, on bursts each model scored before Claude read them. Read precision and recall with how much news they rest on. The v2 classifier, which calls news from a threshold it learns, shipped on October 18, 2026; before it, a fixed 0.5 that the model never reached.</p>
+    <div class="two-col">
+      <al-bars view="classifier_calibration" category="score_band" value="news_base_rate" label="Share Claude labeled news, by the classifier's probability"></al-bars>
+      <al-table view="classifier_by_size" columns="size_tier,evaluated_bursts,evaluated_news,news_precision,news_recall" label="By wiki size"></al-table>
     </div>
     <div class="two-col">
       <al-bars view="classifier_weights" category="feature" value="weight" label="What pushes a burst toward news (+) or away (−)"></al-bars>
       <div class="al-card how">
         <p><strong>Why a classifier, when Claude reads bursts?</strong> Claude reads fresh bursts within a daily budget, a few seconds after each and at a cost. A logistic regression trained on its labels scores every burst the moment it's flagged, for free: Claude's judgment, distilled into eight numbers.</p>
         <p><strong>How it learns.</strong> A pipeline step refits it hourly on every burst Claude has labeled, chooses the probability at which it calls news (the most news caught at 50% precision, on articles it didn't train on), and publishes both as a table, behind a quality gate: its average precision must close at least a fifth of the gap between random guessing and perfect. The burst detector reloads them every 15 minutes.</p>
-        <p><strong>How it's checked.</strong> Agreement with Claude, above, counts only bursts scored before Claude labeled them, so it's accuracy on bursts the model hadn't seen.</p>
+        <p><strong>How it's checked.</strong> Each burst is scored by the model trained before Claude labeled it, so precision, recall and calibration above are measured on bursts the model hadn't seen. A calibrated model's bars rise band by band, roughly to each band's probability.</p>
       </div>
     </div>
   </section>

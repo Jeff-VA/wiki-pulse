@@ -50,7 +50,7 @@
     <div class="al-head">
       <div>
         <h2 id="daily-title">Day by day</h2>
-        <p class="al-caption">Every Wikipedia: today live from the real-time tier, earlier days from Iceberg, merged into one line.</p>
+        <p class="al-caption">Every Wikipedia, complete days only (UTC): today and the stack's first, partial day are left out, so neither reads as a dip.</p>
       </div>
     </div>
     <div class="controls">
@@ -58,6 +58,23 @@
       <al-param name="daily_metric" kind="select" label="Metric" view="edits_daily" options="edit_count,editors,revert_share"></al-param>
     </div>
     <al-lines view="edits_daily" x="day" y="$daily_metric" height="200"></al-lines>
+  </section>
+
+  <section class="al-section" aria-labelledby="content-title">
+    <div class="al-head">
+      <div>
+        <h2 id="content-title">What edits change, by wiki size</h2>
+        <p class="al-caption">Over the same range. Small wikis make bigger edits, and more of them without a summary.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <al-param name="content_metric" kind="select" label="Metric" view="content_by_size"
+                options="median_edit_size,minor_share,no_summary_share,large_removal_share"></al-param>
+    </div>
+    <div class="two-col">
+      <al-bars view="content_by_size" category="size_tier" value="$content_metric"></al-bars>
+      <al-table view="content_by_size" columns="size_tier,all_edits,median_edit_size,minor_share,no_summary_share,large_removal_share"></al-table>
+    </div>
   </section>
 
   <section class="al-section" aria-labelledby="compare-title">

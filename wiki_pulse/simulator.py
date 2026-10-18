@@ -73,6 +73,7 @@ def alert(rng: random.Random, start: datetime) -> list[dict]:
     title = rng.choice(titles)
     edits, editors = rng.randrange(8, 45), rng.randrange(3, 16)
     news = rng.random() < 0.5
+    p_news = round(rng.uniform(0.6, 0.95) if news else rng.uniform(0.05, 0.4), 3)
     return [
         {
             "event_ts": start,
@@ -87,7 +88,9 @@ def alert(rng: random.Random, start: datetime) -> list[dict]:
             "bot_share": round(rng.uniform(0, 0.2), 3),
             "anonymous_share": round(rng.uniform(0, 0.4), 3),
             "revert_share": round(rng.uniform(0, 0.5 if not news else 0.1), 3),
-            "p_news": round(rng.uniform(0.6, 0.95) if news else rng.uniform(0.05, 0.4), 3),
+            "p_news": p_news,
+            "called_news": p_news >= 0.35,  # the call at a learned threshold, as the detector records it
+            "read_probability": 1.0,
             "claude_label": "news" if news else rng.choice(["edit war", "routine", "unclear"]),
             "explanation": f"Editors are updating {title} as a story develops." if news else f"A dispute over {title}: repeated reverts.",
         }

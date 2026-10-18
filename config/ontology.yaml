@@ -308,6 +308,11 @@ models:
         denominator: read_bursts
         label: News share
         format: percent
+      - name: called_news_bursts
+        description: Bursts the news classifier called news (at its model's learned threshold; 0.5 before October 18, 2026).
+        agg: count
+        filters: ["{{ called_news() }}"]
+        label: Called news
       - name: peak_edits
         description: Most edits a burst had in its 30 minutes.
         agg: max
@@ -414,6 +419,14 @@ models:
           fresh, or Claude's budget was spent). first come: before October 18,
           when Claude read the first bursts of each hour, skewed toward quiet hours.
         sql: "{{ label_sample() }}"
+      - name: call_rule
+        type: string
+        label: Call rule
+        description: >
+          Which rule made the classifier's call: learned (the threshold its model
+          learned, from October 18, 2026, when the v2 classifier shipped), fixed
+          0.5 (before then), or unscored. Judge each model on its own calls.
+        sql: "{{ call_rule() }}"
     metrics:
       - name: flagged_bursts
         description: Number of bursts flagged, labeled or not.
