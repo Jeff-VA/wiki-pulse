@@ -379,35 +379,37 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.88rem; border-top: 
 
 <section>
   <h2>Decisions</h2>
+  <p class="prose">All six shipped on October 18, 2026. The live classifier now trains on the v2 features, calls news
+    from the threshold it learns, and records each call on the burst (<code>called_news</code>).</p>
   <div class="decisions">
-    <div class="decision"><div class="n">1</div><h3>Keep logistic regression <span class="pill ask">Recommended</span></h3>
+    <div class="decision"><div class="n">1</div><h3>Keep logistic regression <span class="pill done">Shipped</span></h3>
       <p>Tuned XGBoost scores <span data-v="m.xgb_v2.metrics.ap" data-f="d2"></span> on v2 and
         <span data-v="m.xgb_all.metrics.ap" data-f="d2"></span> on every feature, against logistic regression's
         <span data-v="m.lr_v2.metrics.ap" data-f="d2"></span>, and tuning chose C =
         <span data-v="settled.lr_c" data-f="d1"></span>, the deployed value. Revisit XGBoost by rerunning this study as
         random-sample labels accumulate, and switch when its learning curve crosses LR's.</p></div>
-    <div class="decision"><div class="n">2</div><h3>Ship the v2 features <span class="pill ask">Recommended</span></h3>
+    <div class="decision"><div class="n">2</div><h3>Ship the v2 features <span class="pill done">Shipped</span></h3>
       <p>Large wiki and usual edits in place of surprise carry the gain; year in title is cheap and marginal. None
         needs a new data feed: the size tier is
         the <code>wikis</code> lookup the stack already maintains, the year is a regex on the title, and usual edits
         is already on every burst row. <code>classifier.py</code>'s feature list and the detector change together,
         so training and serving compute the same features.</p></div>
-    <div class="decision"><div class="n">3</div><h3>Learn the threshold with the weights <span class="pill ask">Recommended</span></h3>
+    <div class="decision"><div class="n">3</div><h3>Learn the threshold with the weights <span class="pill done">Shipped</span></h3>
       <p>Call news at the probability that keeps precision at 50% or more: <span data-v="t.p50.threshold" data-f="d2"></span>
         here, catching <span data-v="t.p50.recall" data-f="pct0"></span> of news, about
         <span data-v="t.p50.news_calls_per_day" data-f="d1"></span> calls a day. The step stores it in
         <code>gold.news_classifier</code>, the detector records each burst's call, and the <code>called_news()</code>
         macro reads that call in place of a hard-coded 0.5.</p></div>
-    <div class="decision"><div class="n">4</div><h3>Gate the model on what matters <span class="pill ask">Recommended</span></h3>
+    <div class="decision"><div class="n">4</div><h3>Gate the model on what matters <span class="pill done">Shipped</span></h3>
       <p>The current gate (training accuracy above always answering "not news") passes almost any model: the live one
-        cleared it by 0.6 points. Gate instead on grouped out-of-fold average precision beating the base rate by a
-        clear margin, computed in the step with the same numpy fit.</p></div>
-    <div class="decision"><div class="n">5</div><h3>How many bursts Claude reads <span class="pill ask">Your call</span></h3>
-      <p>Claude now reads a random half of fresh bursts, about the old spend. Reading all of them costs about $0.26 a
-        day and doubles the labels, which is what this model is short of. Keeping a fraction unread costs labels and
-        buys nothing for the evaluation, because the random half is already unbiased.</p></div>
-    <div class="decision"><div class="n">6</div><h3>Label sampling <span class="pill done">Done today</span></h3>
-      <p>Random reads with a logged probability, <code>read_probability</code> on every burst, and the
+        cleared it by 0.6 points. The gate is now grouped out-of-fold average precision closing at least a fifth of the
+        gap between random guessing and perfect, computed in the step with the same numpy fit.</p></div>
+    <div class="decision"><div class="n">5</div><h3>Claude reads every fresh burst <span class="pill done">Shipped</span></h3>
+      <p>The model is short of labels, not compute. Reading every fresh burst costs about $0.22 a day and doubles the
+        labels; a burst that arrives with the budget spent records a chance of 0, so the sample stays one whose bias
+        is known.</p></div>
+    <div class="decision"><div class="n">6</div><h3>Label sampling <span class="pill done">Shipped</span></h3>
+      <p>Reads with a logged probability, <code>read_probability</code> on every burst, and the
         <code>label_sample</code> dimension in <code>classifier_eval</code>. From here on, the random sample is the
         clean test set for every decision above.</p></div>
   </div>
