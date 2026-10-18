@@ -4,10 +4,10 @@ A processor over the edits stream (ingestion.yaml: trends). For every article
 it keeps the last 30 minutes of edits. When the count stands far above what's
 usual for an article being edited on that wiki at that hour of the day, it
 emits a burst: the counts, how surprising they are (in standard deviations),
-the news classifier's probability that it's a story breaking, and, for a
-random sample of fresh bursts within a budget, Claude's label and one-line
-explanation. Each burst records its chance of being read, so the labels are a
-sample whose bias is known, and the classifier can be judged without it.
+the news classifier's probability that it's a story breaking, and, for fresh
+bursts within a budget, Claude's label and one-line explanation. Each burst
+records its chance of being read, so the labels are a sample whose bias is
+known, and the classifier can be judged without it.
 
 What's usual comes from a pipeline step, gold.trend_baselines; the classifier's
 weights from another, gold.news_classifier. The detector reloads both every 15
@@ -29,16 +29,17 @@ THRESHOLD = 4.0  # standard deviations above the usual count
 REPEAT_AFTER = timedelta(hours=2)  # sooner only if a burst grows half as surprising again
 RELOAD = timedelta(minutes=15)
 FRESH = timedelta(minutes=2)  # older bursts (a replay after a restart) don't spend Claude's budget
-READ_PROBABILITY = 0.5  # Claude reads each fresh burst with this chance while its budget has room
+READ_PROBABILITY = 1.0  # Claude reads each fresh burst with this chance while its budget has room: every one, for now
 DEFAULT = (0.7, 1.2)  # usual 30-minute count for an article being edited (mean, std), until baselines exist
 
 
 class TrendDetector:
     def __init__(self, context, explainer: Explainer | None = None, use_claude: bool = True,
-                 chance: Callable[[], float] = random.random):
+                 chance: Callable[[], float] = random.random, read_probability: float = READ_PROBABILITY):
         self.context = context
         self.explainer = explainer or (Explainer.from_environment(context.log) if use_claude else None)
         self.chance = chance  # a uniform draw in [0, 1), which picks the bursts Claude reads
+        self.read_probability = read_probability
         self.windows: dict[tuple[str, str], deque] = {}
         self.reported: dict[tuple[str, str], tuple[datetime, float]] = {}
         self.baselines: dict[tuple[str, int], tuple[float, float]] = {}
@@ -98,8 +99,8 @@ class TrendDetector:
             # Reading the first bursts of each hour skewed the labels toward quiet hours. A coin flip, with its odds
             # recorded, makes them a random sample of every burst Claude could have read; 0 where it couldn't.
             eligible = self.context.now() - when <= FRESH and self.explainer.has_budget()
-            burst["read_probability"] = READ_PROBABILITY if eligible else 0.0
-            if eligible and self.chance() < READ_PROBABILITY:
+            burst["read_probability"] = self.read_probability if eligible else 0.0
+            if eligible and self.chance() < self.read_probability:
                 reading = self.explainer.read(burst, [e["edit_summary"] for e in window if e.get("edit_summary")][-12:])
         burst["claude_label"] = reading.category if reading else None
         burst["explanation"] = reading.explanation if reading else None

@@ -1,8 +1,8 @@
 """Claude's read of a burst: what kind it is, and what's happening, in one sentence.
 
-The burst detector asks about a random sample of fresh bursts, within a budget
-(15 reads an hour, 200 a day; a read costs about $0.0009), using Claude Haiku
-4.5: quick and cheap for a short, structured answer. Each read logs the tokens
+The burst detector asks about fresh bursts, within a budget (30 reads an hour,
+400 a day; a read costs about $0.0009, and about 250 bursts a day cost about
+$0.22), using Claude Haiku 4.5: quick and cheap for a short, structured answer. Each read logs the tokens
 it used. The label trains the news classifier; the sentence goes on the
 dashboard. Without ANTHROPIC_API_KEY, bursts simply go without either.
 """
@@ -35,7 +35,7 @@ class Reading(BaseModel):
 
 
 class Explainer:
-    def __init__(self, client: anthropic.Anthropic, *, per_hour: int = 15, per_day: int = 200, log=print, clock=time.monotonic):
+    def __init__(self, client: anthropic.Anthropic, *, per_hour: int = 30, per_day: int = 400, log=print, clock=time.monotonic):
         self.client, self.per_hour, self.per_day, self.log, self.clock = client, per_hour, per_day, log, clock
         self.calls: deque[float] = deque()  # when each read of the last day was made
         self.spent_today = False

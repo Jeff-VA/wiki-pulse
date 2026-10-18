@@ -39,7 +39,7 @@ class Claude:
         return Reading(category="news", explanation=f"{burst['title']} is in the news.")
 
 
-def detector(tables=None, explainer=None, now=START + timedelta(minutes=7), chance=0.0):  # a minute after the test burst
+def detector(tables=None, explainer=None, now=START + timedelta(minutes=7), chance=0.0, read_probability=READ_PROBABILITY):  # a minute after the test burst
     tables = {"gold.trend_baselines": BASELINES, "gold.news_classifier": MODEL} if tables is None else tables
     platform = load_platform(CONFIG)
     messages = []
@@ -51,7 +51,7 @@ def detector(tables=None, explainer=None, now=START + timedelta(minutes=7), chan
         return tables[table]
 
     context = ProcessorContext(platform.dataset("trends"), platform.dataset("edits"), query=query, log=messages.append, now=lambda: now)
-    return TrendDetector(context, explainer=explainer, use_claude=False, chance=lambda: chance), messages
+    return TrendDetector(context, explainer=explainer, use_claude=False, chance=lambda: chance, read_probability=read_probability), messages
 
 
 def edit(minute: float, title="Taylor Swift", editor="Editor1", **fields) -> dict:
@@ -132,13 +132,20 @@ def test_claude_doesnt_spend_its_budget_on_old_bursts():
     assert burst["read_probability"] == 0.0  # it never had a chance of being read
 
 
-@pytest.mark.parametrize("chance, read", [(0.0, True), (READ_PROBABILITY - 0.01, True), (READ_PROBABILITY, False), (0.99, False)])
-def test_claude_reads_a_random_sample_and_each_burst_records_its_odds(chance, read):
+def test_claude_reads_every_fresh_burst_while_its_budget_has_room():
     claude = Claude()
-    trends, _ = detector(explainer=claude, chance=chance)
+    trends, _ = detector(explainer=claude, chance=0.999)
+    [burst] = trends.process(busy(10))
+    assert claude.asked and burst["read_probability"] == READ_PROBABILITY == 1.0
+
+
+@pytest.mark.parametrize("chance, read", [(0.0, True), (0.49, True), (0.5, False), (0.99, False)])
+def test_reading_a_sample_records_each_bursts_odds(chance, read):
+    claude = Claude()
+    trends, _ = detector(explainer=claude, chance=chance, read_probability=0.5)
     [burst] = trends.process(busy(10))
     assert bool(claude.asked) == read and (burst["claude_label"] == "news") == read
-    assert burst["read_probability"] == READ_PROBABILITY  # read or not, it had this chance: the labels' sampling weight
+    assert burst["read_probability"] == 0.5  # read or not, it had this chance: the labels' sampling weight
 
 
 def test_a_burst_arriving_with_the_budget_spent_had_no_chance_of_being_read():

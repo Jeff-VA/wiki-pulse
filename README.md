@@ -10,8 +10,8 @@ pipelines, live dashboards and AI agents over the same governed metrics.
   Iceberg (all history).
 - **A stream processor flags bursts**: articles getting far more edits than
   usual for their wiki and the hour, seconds after the edit that tips them over.
-- **Claude Haiku 4.5 reads a random sample of fresh bursts**: news, edit war,
-  routine or unclear, with one sentence saying what's happening.
+- **Claude Haiku 4.5 reads every fresh burst**: news, edit war, routine or
+  unclear, with one sentence saying what's happening.
 - **A classifier distills Claude's judgment**: a logistic regression that a
   pipeline step retrains hourly on Claude's labels, which the detector applies
   to *every* burst in real time, including the many Claude never reads.
@@ -67,11 +67,13 @@ without publishing anything twice.
 
 **Claude.** The detector sends Claude Haiku 4.5 the article, its numbers and
 its recent edit summaries, and gets back a structured label and sentence. It
-asks about a random half of fresh bursts, at most 15 an hour and 200 a day
-(about $0.0009 a read), and records each burst's chance of being read. That
-makes the labels a random sample of the bursts, so the classifier can be
-judged without bias (`label_sample` in `classifier_eval`). Each read logs the
-tokens it used.
+asks about every fresh burst, at most 30 an hour and 400 a day (about
+$0.0009 a read, about $0.22 a day), and records each burst's chance of being
+read. When the budget binds, a burst records 0; `READ_PROBABILITY` in
+`trends.py` can make Claude read a random fraction instead. Either way the
+labels are a sample whose bias is known, so the classifier can be judged
+without it (`label_sample` in `classifier_eval`). Each read logs the tokens it
+used.
 
 **The classifier.** It is an L2-regularized logistic regression, fit by
 Newton's method in numpy. Its features are the log of edits, editors and

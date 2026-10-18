@@ -366,7 +366,8 @@ models:
       burst with the model trained before it, so these are out-of-sample. Labeled
       bursts are few, so read every rate alongside its counts and label_coverage.
       Until October 18, 2026 Claude read the first fresh bursts of each hour, a
-      skewed sample; since then it reads a random one. For unbiased rates, filter
+      skewed sample; since then each burst records its chance of being read (every
+      fresh burst, while the budget has room). For unbiased rates, filter
       on label_sample = 'random'.
     source: trends
     time_dimension: event_ts
